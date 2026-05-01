@@ -41,4 +41,19 @@ public record Invoice(
     public Optional<Instant> maybePaidAt() {
         return Optional.ofNullable(paidAt);
     }
+
+    public Invoice withStatus(InvoiceStatus newStatus, Instant now) {
+        return new Invoice(
+                id,
+                ticketId,
+                userId,
+                providerCode,
+                newStatus,
+                amount,
+                externalInvoiceId,
+                idempotencyKey,
+                createdAt,
+                expiresAt,
+                newStatus == InvoiceStatus.PAID ? now : paidAt);
+    }
 }

@@ -14,5 +14,7 @@ public interface InvoiceRepository {
 
     Optional<Invoice> findByIdempotencyKey(String idempotencyKey);
 
+    Optional<Invoice> findByExternalInvoiceId(String providerCode, String externalInvoiceId);
+
     List<Invoice> findByUserId(UUID userId, int limit, int offset);
 }

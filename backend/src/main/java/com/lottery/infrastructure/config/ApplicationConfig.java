@@ -2,6 +2,8 @@ package com.lottery.infrastructure.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.mapper.DrawMapper;
+import com.lottery.application.mapper.InvoiceMapper;
+import com.lottery.application.mapper.PaymentMapper;
 import com.lottery.application.mapper.TicketMapper;
 import com.lottery.application.mapper.UserMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
@@ -11,6 +13,9 @@ import com.lottery.application.usecase.draw.ListDrawsUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
 import com.lottery.application.usecase.auth.LoginByPasswordUseCase;
 import com.lottery.application.usecase.auth.RegisterUserUseCase;
+import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
+import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
+import com.lottery.application.usecase.payment.RefundPaymentUseCase;
 import com.lottery.application.usecase.ticket.CreateTicketUseCase;
 import com.lottery.application.usecase.ticket.ListTicketsUseCase;
 import com.lottery.application.usecase.user.CreateUserUseCase;
@@ -21,6 +26,7 @@ import com.lottery.domain.repository.DrawRepository;
 import com.lottery.domain.repository.DrawResultRepository;
 import com.lottery.domain.repository.InvoiceRepository;
 import com.lottery.domain.repository.PaymentRepository;
+import com.lottery.domain.repository.PaymentWebhookEventRepository;
 import com.lottery.domain.repository.RbacRepository;
 import com.lottery.domain.repository.TicketRepository;
 import com.lottery.domain.repository.UserRepository;
@@ -28,11 +34,13 @@ import com.lottery.domain.repository.WinningRuleRepository;
 import com.lottery.domain.service.DomainClock;
 import com.lottery.infrastructure.lottery.JsonCombinationEngine;
 import com.lottery.infrastructure.openapi.OpenApiResource;
+import com.lottery.infrastructure.payment.MockPaymentProviderAdapter;
 import com.lottery.infrastructure.persistence.jdbc.JdbcCombinationSchemaRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcDrawRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcDrawResultRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcInvoiceRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentRepository;
+import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentWebhookEventRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcRbacRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTicketRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTransactionManager;
@@ -51,6 +59,9 @@ import com.lottery.presentation.rest.draw.CreateDrawServlet;
 import com.lottery.presentation.rest.draw.RunDrawServlet;
 import com.lottery.presentation.rest.health.HealthServlet;
 import com.lottery.presentation.rest.health.ReadyServlet;
+import com.lottery.presentation.rest.payment.CreateInvoiceServlet;
+import com.lottery.presentation.rest.payment.PaymentWebhookServlet;
+import com.lottery.presentation.rest.payment.RefundPaymentServlet;
 import com.lottery.presentation.rest.ticket.CreateTicketServlet;
 import com.lottery.presentation.rest.user.CreateUserServlet;
 import jakarta.servlet.DispatcherType;
@@ -81,11 +92,13 @@ public final class ApplicationConfig {
         WinningRuleRepository winningRuleRepository = new JdbcWinningRuleRepository(transactionManager);
         InvoiceRepository invoiceRepository = new JdbcInvoiceRepository(transactionManager);
         PaymentRepository paymentRepository = new JdbcPaymentRepository(transactionManager);
+        PaymentWebhookEventRepository paymentWebhookEventRepository = new JdbcPaymentWebhookEventRepository(transactionManager);
         RbacRepository rbacRepository = new JdbcRbacRepository(transactionManager);
 
         AuthorizationPort authorizationPort = new DatabaseAuthorizationAdapter(rbacRepository);
         PasswordHasher passwordHasher = new BcryptPasswordHasher(properties.bcryptCost());
         InMemorySessionTokenService tokenService = new InMemorySessionTokenService(properties.accessTokenTtlSeconds());
+        MockPaymentProviderAdapter paymentProvider = new MockPaymentProviderAdapter(properties.mockPaymentWebhookSecret());
 
         CreateUserUseCase createUserUseCase = new CreateUserUseCase(
                 userRepository,
@@ -145,6 +158,33 @@ public final class ApplicationConfig {
                 authorizationPort,
                 transactionManager,
                 new TicketMapper());
+        CreateInvoiceForTicketUseCase createInvoiceForTicketUseCase = new CreateInvoiceForTicketUseCase(
+                ticketRepository,
+                invoiceRepository,
+                paymentRepository,
+                paymentProvider,
+                authorizationPort,
+                transactionManager,
+                clock,
+                new InvoiceMapper());
+        ProcessPaymentWebhookUseCase processPaymentWebhookUseCase = new ProcessPaymentWebhookUseCase(
+                paymentWebhookEventRepository,
+                invoiceRepository,
+                paymentRepository,
+                ticketRepository,
+                paymentProvider,
+                transactionManager,
+                clock,
+                objectMapper);
+        RefundPaymentUseCase refundPaymentUseCase = new RefundPaymentUseCase(
+                paymentRepository,
+                invoiceRepository,
+                ticketRepository,
+                paymentProvider,
+                authorizationPort,
+                transactionManager,
+                clock,
+                new PaymentMapper());
 
         ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
@@ -172,6 +212,15 @@ public final class ApplicationConfig {
                 new ServletHolder(
                         new CreateTicketServlet(objectMapper, errorHandler, createTicketUseCase, listTicketsUseCase, contextFactory)),
                 "/api/v1/tickets");
+        context.addServlet(
+                new ServletHolder(new CreateInvoiceServlet(objectMapper, errorHandler, createInvoiceForTicketUseCase, contextFactory)),
+                "/api/v1/tickets/*");
+        context.addServlet(
+                new ServletHolder(new PaymentWebhookServlet(objectMapper, errorHandler, processPaymentWebhookUseCase)),
+                "/api/v1/payment-providers/*");
+        context.addServlet(
+                new ServletHolder(new RefundPaymentServlet(objectMapper, errorHandler, refundPaymentUseCase, contextFactory)),
+                "/api/v1/payments/*");
 
         Server server = new Server(properties.httpPort());
         server.setHandler(context);

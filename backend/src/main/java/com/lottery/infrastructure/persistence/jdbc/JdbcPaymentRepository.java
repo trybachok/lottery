@@ -84,6 +84,17 @@ public final class JdbcPaymentRepository implements PaymentRepository {
     }
 
     @Override
+    public Optional<Payment> findByInvoiceId(UUID invoiceId) {
+        return findOne("""
+                select id, invoice_id, provider_code, status, amount, currency, external_payment_id, created_at, updated_at
+                from payments
+                where invoice_id = ?
+                order by created_at desc
+                limit 1
+                """, statement -> statement.setObject(1, invoiceId));
+    }
+
+    @Override
     public List<Payment> findByInvoiceId(UUID invoiceId, int limit, int offset) {
         String sql = """
                 select id, invoice_id, provider_code, status, amount, currency, external_payment_id, created_at, updated_at

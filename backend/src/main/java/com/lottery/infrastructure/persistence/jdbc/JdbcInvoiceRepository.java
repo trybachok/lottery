@@ -94,6 +94,19 @@ public final class JdbcInvoiceRepository implements InvoiceRepository {
     }
 
     @Override
+    public Optional<Invoice> findByExternalInvoiceId(String providerCode, String externalInvoiceId) {
+        return findOne("""
+                select id, ticket_id, user_id, provider_code, status, amount, currency, external_invoice_id,
+                       idempotency_key, created_at, expires_at, paid_at
+                from invoices
+                where provider_code = ? and external_invoice_id = ?
+                """, statement -> {
+            statement.setString(1, providerCode);
+            statement.setString(2, externalInvoiceId);
+        });
+    }
+
+    @Override
     public List<Invoice> findByUserId(UUID userId, int limit, int offset) {
         String sql = """
                 select id, ticket_id, user_id, provider_code, status, amount, currency, external_invoice_id,

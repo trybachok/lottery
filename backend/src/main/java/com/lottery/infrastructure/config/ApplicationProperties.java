@@ -9,7 +9,8 @@ public record ApplicationProperties(
         String jdbcPassword,
         boolean migrationsEnabled,
         int bcryptCost,
-        long accessTokenTtlSeconds) {
+        long accessTokenTtlSeconds,
+        String mockPaymentWebhookSecret) {
     public static ApplicationProperties fromEnvironment(Map<String, String> env) {
         return new ApplicationProperties(
                 intValue(env, "LOTTERY_HTTP_PORT", 8080),
@@ -18,7 +19,8 @@ public record ApplicationProperties(
                 env.getOrDefault("LOTTERY_JDBC_PASSWORD", "lottery"),
                 booleanValue(env, "LOTTERY_DB_MIGRATIONS_ENABLED", false),
                 intValue(env, "LOTTERY_BCRYPT_COST", 12),
-                intValue(env, "LOTTERY_ACCESS_TOKEN_TTL_SECONDS", 900));
+                intValue(env, "LOTTERY_ACCESS_TOKEN_TTL_SECONDS", 900),
+                env.getOrDefault("LOTTERY_MOCK_PAYMENT_WEBHOOK_SECRET", "local-mock-payment-secret"));
     }
 
     private static int intValue(Map<String, String> env, String key, int defaultValue) {

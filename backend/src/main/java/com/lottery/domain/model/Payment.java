@@ -29,4 +29,8 @@ public record Payment(
     public Optional<String> maybeExternalPaymentId() {
         return Optional.ofNullable(externalPaymentId);
     }
+
+    public Payment withStatus(PaymentStatus newStatus, Instant now) {
+        return new Payment(id, invoiceId, providerCode, newStatus, amount, externalPaymentId, createdAt, now);
+    }
 }

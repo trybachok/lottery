@@ -101,6 +101,32 @@ public final class Ticket {
                 version);
     }
 
+    public Ticket withPaymentStatus(TicketStatus newStatus, Instant now) {
+        if (newStatus != TicketStatus.PAYMENT_PENDING
+                && newStatus != TicketStatus.PAID
+                && newStatus != TicketStatus.PAYMENT_FAILED
+                && newStatus != TicketStatus.REFUND_PENDING
+                && newStatus != TicketStatus.REFUNDED) {
+            throw new IllegalArgumentException("Unsupported payment-related ticket status: " + newStatus);
+        }
+        return new Ticket(
+                id,
+                userId,
+                drawId,
+                newStatus,
+                combination,
+                price,
+                matchPercent,
+                prizeId,
+                test,
+                createdAt,
+                newStatus == TicketStatus.PAID ? now : paidAt,
+                checkedAt,
+                cancelledAt,
+                deletedAt,
+                version);
+    }
+
     public UUID id() {
         return id;
     }

@@ -232,6 +232,112 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateTicketRequest'
+  /tickets/{ticketId}/invoice:
+    post:
+      operationId: createInvoiceForTicket
+      summary: Create payment invoice for ticket
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: ticketId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+  /payments/{paymentId}/refund:
+    post:
+      operationId: refundPayment
+      summary: Refund captured payment
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment refunded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundPaymentRequest'
+  /payment-providers/{providerCode}/webhook:
+    post:
+      operationId: processPaymentWebhook
+      summary: Process signed payment provider webhook
+      parameters:
+        - name: providerCode
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-Mock-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Webhook accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentWebhookResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhookPayload'
 components:
   securitySchemes:
     bearerAuth:
@@ -252,6 +358,12 @@ components:
     TicketStatus:
       type: string
       enum: [CREATED, PAYMENT_PENDING, PAID, PAYMENT_FAILED, REFUND_PENDING, REFUNDED, CANCELLED, PARTICIPATED, NOT_PARTICIPATED, CHECKED, WIN, LOSE, DELETED, TEST]
+    InvoiceStatus:
+      type: string
+      enum: [CREATED, PENDING, PAID, FAILED, CANCELLED, REFUND_PENDING, REFUNDED, EXPIRED]
+    PaymentStatus:
+      type: string
+      enum: [INITIATED, AUTHORIZED, CAPTURED, FAILED, CANCELLED, REFUNDED]
     UserStatus:
       type: string
       enum: [ACTIVE, BLOCKED, DELETED]
@@ -502,3 +614,111 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Ticket'
+    CreateInvoiceRequest:
+      type: object
+      required: [providerCode, idempotencyKey]
+      properties:
+        providerCode:
+          type: string
+          example: mock
+        idempotencyKey:
+          type: string
+          minLength: 1
+    Invoice:
+      type: object
+      required: [id, ticketId, userId, providerCode, status, amount, currency, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticketId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        providerCode:
+          type: string
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+        amount:
+          type: string
+          format: decimal
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        externalInvoiceId:
+          type: string
+        paymentUrl:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+    Payment:
+      type: object
+      required: [id, invoiceId, providerCode, status, amount, currency, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        providerCode:
+          type: string
+        status:
+          $ref: '#/components/schemas/PaymentStatus'
+        amount:
+          type: string
+          format: decimal
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        externalPaymentId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    RefundPaymentRequest:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+    PaymentWebhookPayload:
+      type: object
+      required: [eventId, eventType, externalInvoiceId]
+      properties:
+        eventId:
+          type: string
+        eventType:
+          type: string
+          enum: [PAYMENT_SUCCEEDED, PAYMENT_FAILED]
+        externalInvoiceId:
+          type: string
+    PaymentWebhookResult:
+      type: object
+      required: [eventId, processed, duplicate, status]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+        processed:
+          type: boolean
+        duplicate:
+          type: boolean
+        status:
+          type: string

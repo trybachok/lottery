@@ -14,6 +14,7 @@ public interface PaymentProviderPort {
     RefundResult refundPayment(RefundRequest request);
 
     record InvoiceCreationRequest(
+            String providerCode,
             UUID ticketId,
             UUID userId,
             BigDecimal amount,
@@ -21,7 +22,7 @@ public interface PaymentProviderPort {
             String idempotencyKey) {
     }
 
-    record InvoiceCreationResult(String providerCode, String externalInvoiceId, String paymentUrl) {
+    record InvoiceCreationResult(String providerCode, String externalInvoiceId, String externalPaymentId, String paymentUrl) {
     }
 
     record PaymentStatusRequest(String providerCode, String externalPaymentId) {

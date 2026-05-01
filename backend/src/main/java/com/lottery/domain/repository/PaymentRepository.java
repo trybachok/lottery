@@ -14,5 +14,7 @@ public interface PaymentRepository {
 
     Optional<Payment> findByExternalPaymentId(String externalPaymentId);
 
+    Optional<Payment> findByInvoiceId(UUID invoiceId);
+
     List<Payment> findByInvoiceId(UUID invoiceId, int limit, int offset);
 }

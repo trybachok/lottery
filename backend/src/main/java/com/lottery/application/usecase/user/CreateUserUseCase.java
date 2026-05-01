@@ -2,6 +2,7 @@ package com.lottery.application.usecase.user;
 
 import com.lottery.application.ConflictException;
 import com.lottery.application.UseCaseContext;
+import com.lottery.application.audit.AuditService;
 import com.lottery.application.command.CreateUserCommand;
 import com.lottery.application.dto.UserDto;
 import com.lottery.application.mapper.UserMapper;
@@ -20,6 +21,7 @@ public final class CreateUserUseCase {
     private final TransactionManager transactionManager;
     private final DomainClock clock;
     private final UserMapper mapper;
+    private final AuditService auditService;
 
     public CreateUserUseCase(
             UserRepository userRepository,
@@ -28,12 +30,24 @@ public final class CreateUserUseCase {
             TransactionManager transactionManager,
             DomainClock clock,
             UserMapper mapper) {
+        this(userRepository, authorizationPort, passwordHasher, transactionManager, clock, mapper, null);
+    }
+
+    public CreateUserUseCase(
+            UserRepository userRepository,
+            AuthorizationPort authorizationPort,
+            PasswordHasher passwordHasher,
+            TransactionManager transactionManager,
+            DomainClock clock,
+            UserMapper mapper,
+            AuditService auditService) {
         this.userRepository = userRepository;
         this.authorizationPort = authorizationPort;
         this.passwordHasher = passwordHasher;
         this.transactionManager = transactionManager;
         this.clock = clock;
         this.mapper = mapper;
+        this.auditService = auditService;
     }
 
     public UserDto execute(CreateUserCommand command, UseCaseContext context) {
@@ -49,7 +63,11 @@ public final class CreateUserUseCase {
                     ? null
                     : passwordHasher.hash(command.rawPassword());
             User user = User.create(command.email(), command.login(), passwordHash, clock.now());
-            return mapper.toDto(userRepository.save(user));
+            UserDto dto = mapper.toDto(userRepository.save(user));
+            if (auditService != null) {
+                auditService.record(context, "USER_CREATE", "USER", dto.id());
+            }
+            return dto;
         });
     }
 }

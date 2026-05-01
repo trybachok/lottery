@@ -338,12 +338,213 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PaymentWebhookPayload'
+  /reports/draws:
+    get:
+      operationId: getDrawReport
+      summary: Get draws report
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdQuery'
+        - $ref: '#/components/parameters/UserIdQuery'
+        - $ref: '#/components/parameters/DrawStatusQuery'
+        - $ref: '#/components/parameters/DateFromQuery'
+        - $ref: '#/components/parameters/DateToQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Draw report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DrawListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /reports/tickets:
+    get:
+      operationId: getTicketReport
+      summary: Get tickets report
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdQuery'
+        - $ref: '#/components/parameters/DrawIdQuery'
+        - $ref: '#/components/parameters/TicketStatusQuery'
+        - $ref: '#/components/parameters/DateFromQuery'
+        - $ref: '#/components/parameters/DateToQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Ticket report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /reports/draws/export:
+    get:
+      operationId: exportDrawReport
+      summary: Export draws report
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FormatQuery'
+        - $ref: '#/components/parameters/DrawIdQuery'
+        - $ref: '#/components/parameters/UserIdQuery'
+        - $ref: '#/components/parameters/DrawStatusQuery'
+        - $ref: '#/components/parameters/DateFromQuery'
+        - $ref: '#/components/parameters/DateToQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Draw report export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DrawListResponse'
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /reports/tickets/export:
+    get:
+      operationId: exportTicketReport
+      summary: Export tickets report
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/FormatQuery'
+        - $ref: '#/components/parameters/UserIdQuery'
+        - $ref: '#/components/parameters/DrawIdQuery'
+        - $ref: '#/components/parameters/TicketStatusQuery'
+        - $ref: '#/components/parameters/DateFromQuery'
+        - $ref: '#/components/parameters/DateToQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Ticket report export
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketListResponse'
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin/audit-logs:
+    get:
+      operationId: getAuditLogs
+      summary: Get audit logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdQuery'
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: entityType
+          in: query
+          schema:
+            type: string
+        - name: entityId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/DateFromQuery'
+        - $ref: '#/components/parameters/DateToQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
       type: http
       scheme: bearer
       bearerFormat: opaque-session-token
+  parameters:
+    UserIdQuery:
+      name: userId
+      in: query
+      schema:
+        type: string
+        format: uuid
+    DrawIdQuery:
+      name: drawId
+      in: query
+      schema:
+        type: string
+        format: uuid
+    DrawStatusQuery:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/DrawStatus'
+    TicketStatusQuery:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/TicketStatus'
+    DateFromQuery:
+      name: dateFrom
+      in: query
+      schema:
+        type: string
+        format: date-time
+    DateToQuery:
+      name: dateTo
+      in: query
+      schema:
+        type: string
+        format: date-time
+    LimitQuery:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 100
+    OffsetQuery:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    FormatQuery:
+      name: format
+      in: query
+      schema:
+        type: string
+        enum: [json, csv]
+        default: json
   responses:
     Error:
       description: Error response
@@ -614,6 +815,48 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Ticket'
+    AuditLog:
+      type: object
+      required: [id, actorRoleCodes, action, entityType, requestId, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorUserId:
+          type: string
+          format: uuid
+        actorRoleCodes:
+          type: array
+          items:
+            type: string
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+          format: uuid
+        requestId:
+          type: string
+        ipAddress:
+          type: string
+        userAgent:
+          type: string
+        beforeJson:
+          type: string
+        afterJson:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    AuditLogListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
     CreateInvoiceRequest:
       type: object
       required: [providerCode, idempotencyKey]

@@ -3,6 +3,7 @@ package com.lottery.application.usecase.draw;
 import com.lottery.application.ConflictException;
 import com.lottery.application.NotFoundException;
 import com.lottery.application.UseCaseContext;
+import com.lottery.application.audit.AuditService;
 import com.lottery.application.dto.RunDrawResultDto;
 import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.lottery.CombinationEvaluatorPort;
@@ -42,6 +43,7 @@ public final class RunDrawUseCase {
     private final CombinationEvaluatorPort evaluator;
     private final DrawStatusTransitionPolicy transitionPolicy;
     private final DomainClock clock;
+    private final AuditService auditService;
 
     public RunDrawUseCase(
             DrawRepository drawRepository,
@@ -55,6 +57,34 @@ public final class RunDrawUseCase {
             CombinationEvaluatorPort evaluator,
             DrawStatusTransitionPolicy transitionPolicy,
             DomainClock clock) {
+        this(
+                drawRepository,
+                combinationSchemaRepository,
+                drawResultRepository,
+                ticketRepository,
+                winningRuleRepository,
+                authorizationPort,
+                transactionManager,
+                generator,
+                evaluator,
+                transitionPolicy,
+                clock,
+                null);
+    }
+
+    public RunDrawUseCase(
+            DrawRepository drawRepository,
+            CombinationSchemaRepository combinationSchemaRepository,
+            DrawResultRepository drawResultRepository,
+            TicketRepository ticketRepository,
+            WinningRuleRepository winningRuleRepository,
+            AuthorizationPort authorizationPort,
+            TransactionManager transactionManager,
+            WinningCombinationGeneratorPort generator,
+            CombinationEvaluatorPort evaluator,
+            DrawStatusTransitionPolicy transitionPolicy,
+            DomainClock clock,
+            AuditService auditService) {
         this.drawRepository = drawRepository;
         this.combinationSchemaRepository = combinationSchemaRepository;
         this.drawResultRepository = drawResultRepository;
@@ -66,6 +96,7 @@ public final class RunDrawUseCase {
         this.evaluator = evaluator;
         this.transitionPolicy = transitionPolicy;
         this.clock = clock;
+        this.auditService = auditService;
     }
 
     public RunDrawResultDto execute(UUID drawId, UseCaseContext context) {
@@ -121,6 +152,9 @@ public final class RunDrawUseCase {
             }
             Instant completedAt = clock.now();
             drawRepository.update(drawing.withStatus(DrawStatus.COMPLETED, completedAt));
+            if (auditService != null) {
+                auditService.record(context, "DRAW_RUN", "DRAW", drawing.id());
+            }
             return new RunDrawResultDto(
                     drawing.id(),
                     savedResult.id(),

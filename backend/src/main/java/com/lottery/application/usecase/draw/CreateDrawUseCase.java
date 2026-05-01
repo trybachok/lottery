@@ -1,6 +1,7 @@
 package com.lottery.application.usecase.draw;
 
 import com.lottery.application.UseCaseContext;
+import com.lottery.application.audit.AuditService;
 import com.lottery.application.command.CreateDrawCommand;
 import com.lottery.application.dto.DrawDto;
 import com.lottery.application.mapper.DrawMapper;
@@ -17,6 +18,7 @@ public final class CreateDrawUseCase {
     private final TransactionManager transactionManager;
     private final DomainClock clock;
     private final DrawMapper mapper;
+    private final AuditService auditService;
 
     public CreateDrawUseCase(
             DrawRepository drawRepository,
@@ -24,11 +26,22 @@ public final class CreateDrawUseCase {
             TransactionManager transactionManager,
             DomainClock clock,
             DrawMapper mapper) {
+        this(drawRepository, authorizationPort, transactionManager, clock, mapper, null);
+    }
+
+    public CreateDrawUseCase(
+            DrawRepository drawRepository,
+            AuthorizationPort authorizationPort,
+            TransactionManager transactionManager,
+            DomainClock clock,
+            DrawMapper mapper,
+            AuditService auditService) {
         this.drawRepository = drawRepository;
         this.authorizationPort = authorizationPort;
         this.transactionManager = transactionManager;
         this.clock = clock;
         this.mapper = mapper;
+        this.auditService = auditService;
     }
 
     public DrawDto execute(CreateDrawCommand command, UseCaseContext context) {
@@ -45,7 +58,11 @@ public final class CreateDrawUseCase {
                     command.maxTickets(),
                     command.test(),
                     clock.now());
-            return mapper.toDto(drawRepository.save(draw));
+            DrawDto dto = mapper.toDto(drawRepository.save(draw));
+            if (auditService != null) {
+                auditService.record(context, "DRAW_CREATE", "DRAW", dto.id());
+            }
+            return dto;
         });
     }
 }

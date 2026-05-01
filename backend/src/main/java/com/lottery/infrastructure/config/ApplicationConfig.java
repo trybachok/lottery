@@ -1,6 +1,8 @@
 package com.lottery.infrastructure.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lottery.application.audit.AuditService;
+import com.lottery.application.mapper.AuditLogMapper;
 import com.lottery.application.mapper.DrawMapper;
 import com.lottery.application.mapper.InvoiceMapper;
 import com.lottery.application.mapper.PaymentMapper;
@@ -8,6 +10,7 @@ import com.lottery.application.mapper.TicketMapper;
 import com.lottery.application.mapper.UserMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.auth.PasswordHasher;
+import com.lottery.application.usecase.audit.ListAuditLogsUseCase;
 import com.lottery.application.usecase.draw.CreateDrawUseCase;
 import com.lottery.application.usecase.draw.ListDrawsUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
@@ -16,11 +19,14 @@ import com.lottery.application.usecase.auth.RegisterUserUseCase;
 import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
+import com.lottery.application.usecase.report.GenerateDrawReportUseCase;
+import com.lottery.application.usecase.report.GenerateTicketReportUseCase;
 import com.lottery.application.usecase.ticket.CreateTicketUseCase;
 import com.lottery.application.usecase.ticket.ListTicketsUseCase;
 import com.lottery.application.usecase.user.CreateUserUseCase;
 import com.lottery.domain.policy.TicketPurchasePolicy;
 import com.lottery.domain.policy.DrawStatusTransitionPolicy;
+import com.lottery.domain.repository.AuditLogRepository;
 import com.lottery.domain.repository.CombinationSchemaRepository;
 import com.lottery.domain.repository.DrawRepository;
 import com.lottery.domain.repository.DrawResultRepository;
@@ -35,6 +41,7 @@ import com.lottery.domain.service.DomainClock;
 import com.lottery.infrastructure.lottery.JsonCombinationEngine;
 import com.lottery.infrastructure.openapi.OpenApiResource;
 import com.lottery.infrastructure.payment.MockPaymentProviderAdapter;
+import com.lottery.infrastructure.persistence.jdbc.JdbcAuditLogRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcCombinationSchemaRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcDrawRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcDrawResultRepository;
@@ -53,6 +60,7 @@ import com.lottery.presentation.error.GlobalErrorHandler;
 import com.lottery.presentation.middleware.RequestContextFilter;
 import com.lottery.presentation.rest.OpenApiServlet;
 import com.lottery.presentation.rest.ServletUseCaseContextFactory;
+import com.lottery.presentation.rest.audit.AuditLogsServlet;
 import com.lottery.presentation.rest.auth.LoginServlet;
 import com.lottery.presentation.rest.auth.RegisterServlet;
 import com.lottery.presentation.rest.draw.CreateDrawServlet;
@@ -62,6 +70,7 @@ import com.lottery.presentation.rest.health.ReadyServlet;
 import com.lottery.presentation.rest.payment.CreateInvoiceServlet;
 import com.lottery.presentation.rest.payment.PaymentWebhookServlet;
 import com.lottery.presentation.rest.payment.RefundPaymentServlet;
+import com.lottery.presentation.rest.report.ReportsServlet;
 import com.lottery.presentation.rest.ticket.CreateTicketServlet;
 import com.lottery.presentation.rest.user.CreateUserServlet;
 import jakarta.servlet.DispatcherType;
@@ -94,8 +103,10 @@ public final class ApplicationConfig {
         PaymentRepository paymentRepository = new JdbcPaymentRepository(transactionManager);
         PaymentWebhookEventRepository paymentWebhookEventRepository = new JdbcPaymentWebhookEventRepository(transactionManager);
         RbacRepository rbacRepository = new JdbcRbacRepository(transactionManager);
+        AuditLogRepository auditLogRepository = new JdbcAuditLogRepository(transactionManager);
 
         AuthorizationPort authorizationPort = new DatabaseAuthorizationAdapter(rbacRepository);
+        AuditService auditService = new AuditService(auditLogRepository, rbacRepository, clock);
         PasswordHasher passwordHasher = new BcryptPasswordHasher(properties.bcryptCost());
         InMemorySessionTokenService tokenService = new InMemorySessionTokenService(properties.accessTokenTtlSeconds());
         MockPaymentProviderAdapter paymentProvider = new MockPaymentProviderAdapter(properties.mockPaymentWebhookSecret());
@@ -106,7 +117,8 @@ public final class ApplicationConfig {
                 passwordHasher,
                 transactionManager,
                 clock,
-                new UserMapper());
+                new UserMapper(),
+                auditService);
         RegisterUserUseCase registerUserUseCase = new RegisterUserUseCase(
                 userRepository,
                 rbacRepository,
@@ -125,7 +137,8 @@ public final class ApplicationConfig {
                 authorizationPort,
                 transactionManager,
                 clock,
-                new DrawMapper());
+                new DrawMapper(),
+                auditService);
         ListDrawsUseCase listDrawsUseCase = new ListDrawsUseCase(
                 drawRepository,
                 authorizationPort,
@@ -143,7 +156,8 @@ public final class ApplicationConfig {
                 combinationEngine,
                 combinationEngine,
                 new DrawStatusTransitionPolicy(),
-                clock);
+                clock,
+                auditService);
         CreateTicketUseCase createTicketUseCase = new CreateTicketUseCase(
                 userRepository,
                 drawRepository,
@@ -184,9 +198,27 @@ public final class ApplicationConfig {
                 authorizationPort,
                 transactionManager,
                 clock,
-                new PaymentMapper());
+                new PaymentMapper(),
+                auditService);
+        GenerateDrawReportUseCase generateDrawReportUseCase = new GenerateDrawReportUseCase(
+                drawRepository,
+                authorizationPort,
+                transactionManager,
+                new DrawMapper(),
+                auditService);
+        GenerateTicketReportUseCase generateTicketReportUseCase = new GenerateTicketReportUseCase(
+                ticketRepository,
+                authorizationPort,
+                transactionManager,
+                new TicketMapper(),
+                auditService);
+        ListAuditLogsUseCase listAuditLogsUseCase = new ListAuditLogsUseCase(
+                auditLogRepository,
+                authorizationPort,
+                transactionManager,
+                new AuditLogMapper());
 
-        ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService);
+        ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService, rbacRepository);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath("/");
         context.addFilter(new FilterHolder(new RequestContextFilter()), "/*", EnumSet.of(DispatcherType.REQUEST));
@@ -221,6 +253,17 @@ public final class ApplicationConfig {
         context.addServlet(
                 new ServletHolder(new RefundPaymentServlet(objectMapper, errorHandler, refundPaymentUseCase, contextFactory)),
                 "/api/v1/payments/*");
+        context.addServlet(
+                new ServletHolder(new ReportsServlet(
+                        objectMapper,
+                        errorHandler,
+                        generateDrawReportUseCase,
+                        generateTicketReportUseCase,
+                        contextFactory)),
+                "/api/v1/reports/*");
+        context.addServlet(
+                new ServletHolder(new AuditLogsServlet(objectMapper, errorHandler, listAuditLogsUseCase, contextFactory)),
+                "/api/v1/admin/audit-logs");
 
         Server server = new Server(properties.httpPort());
         server.setHandler(context);

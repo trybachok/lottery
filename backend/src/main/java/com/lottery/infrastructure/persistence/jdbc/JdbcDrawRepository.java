@@ -4,6 +4,7 @@ import com.lottery.application.OptimisticLockException;
 import com.lottery.domain.model.Draw;
 import com.lottery.domain.repository.DrawRepository;
 import com.lottery.domain.valueobject.DrawStatus;
+import java.time.Instant;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -180,6 +181,65 @@ public final class JdbcDrawRepository implements DrawRepository {
         }
     }
 
+    @Override
+    public List<Draw> findReport(
+            UUID drawId,
+            UUID managerId,
+            DrawStatus status,
+            Instant createdFrom,
+            Instant createdTo,
+            int limit,
+            int offset) {
+        StringBuilder sql = new StringBuilder("""
+                select id, title, description, status, manager_id, combination_schema_id, ui_theme_id, ui_template_id,
+                       sales_start_at, sales_end_at, draw_at, max_tickets, is_test, created_at, updated_at, deleted_at, version
+                from draws
+                where deleted_at is null
+                """);
+        List<SqlParameter> parameters = new ArrayList<>();
+        if (drawId != null) {
+            sql.append(" and id = ?");
+            parameters.add((statement, index) -> statement.setObject(index, drawId));
+        }
+        if (managerId != null) {
+            sql.append(" and manager_id = ?");
+            parameters.add((statement, index) -> statement.setObject(index, managerId));
+        }
+        if (status != null) {
+            sql.append(" and status = ?");
+            parameters.add((statement, index) -> statement.setString(index, status.name()));
+        }
+        if (createdFrom != null) {
+            sql.append(" and created_at >= ?");
+            parameters.add((statement, index) -> JdbcSupport.setInstant(statement, index, createdFrom));
+        }
+        if (createdTo != null) {
+            sql.append(" and created_at <= ?");
+            parameters.add((statement, index) -> JdbcSupport.setInstant(statement, index, createdTo));
+        }
+        sql.append(" order by created_at desc limit ? offset ?");
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+                int index = 1;
+                for (SqlParameter parameter : parameters) {
+                    parameter.bind(statement, index++);
+                }
+                statement.setInt(index++, limit);
+                statement.setInt(index, offset);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<Draw> draws = new ArrayList<>();
+                    while (resultSet.next()) {
+                        draws.add(map(resultSet));
+                    }
+                    return draws;
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to build draw report", exception);
+        }
+    }
+
     private Draw map(ResultSet resultSet) throws SQLException {
         Timestamp deletedAt = resultSet.getTimestamp("deleted_at");
         Integer maxTickets = resultSet.getObject("max_tickets") == null ? null : resultSet.getInt("max_tickets");
@@ -201,5 +261,10 @@ public final class JdbcDrawRepository implements DrawRepository {
                 resultSet.getTimestamp("updated_at").toInstant(),
                 deletedAt == null ? null : deletedAt.toInstant(),
                 resultSet.getLong("version"));
+    }
+
+    @FunctionalInterface
+    private interface SqlParameter {
+        void bind(PreparedStatement statement, int index) throws SQLException;
     }
 }

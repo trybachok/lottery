@@ -14,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Currency;
 import java.util.List;
@@ -186,6 +187,53 @@ public final class JdbcTicketRepository implements TicketRepository {
                 """, statement -> statement.setObject(1, drawId));
     }
 
+    @Override
+    public List<Ticket> findReport(
+            UUID userId,
+            UUID drawId,
+            TicketStatus status,
+            Instant createdFrom,
+            Instant createdTo,
+            int limit,
+            int offset) {
+        StringBuilder sql = new StringBuilder("""
+                select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
+                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                from tickets
+                where deleted_at is null
+                """);
+        List<SqlParameter> parameters = new ArrayList<>();
+        if (userId != null) {
+            sql.append(" and user_id = ?");
+            parameters.add((statement, index) -> statement.setObject(index, userId));
+        }
+        if (drawId != null) {
+            sql.append(" and draw_id = ?");
+            parameters.add((statement, index) -> statement.setObject(index, drawId));
+        }
+        if (status != null) {
+            sql.append(" and status = ?");
+            parameters.add((statement, index) -> statement.setString(index, status.name()));
+        }
+        if (createdFrom != null) {
+            sql.append(" and created_at >= ?");
+            parameters.add((statement, index) -> JdbcSupport.setInstant(statement, index, createdFrom));
+        }
+        if (createdTo != null) {
+            sql.append(" and created_at <= ?");
+            parameters.add((statement, index) -> JdbcSupport.setInstant(statement, index, createdTo));
+        }
+        sql.append(" order by created_at desc limit ? offset ?");
+        return findMany(sql.toString(), statement -> {
+            int index = 1;
+            for (SqlParameter parameter : parameters) {
+                parameter.bind(statement, index++);
+            }
+            statement.setInt(index++, limit);
+            statement.setInt(index, offset);
+        });
+    }
+
     private List<Ticket> findMany(String sql, StatementBinder binder) {
         try {
             Connection connection = connectionProvider.currentConnection();
@@ -231,5 +279,10 @@ public final class JdbcTicketRepository implements TicketRepository {
     @FunctionalInterface
     private interface StatementBinder {
         void bind(PreparedStatement statement) throws SQLException;
+    }
+
+    @FunctionalInterface
+    private interface SqlParameter {
+        void bind(PreparedStatement statement, int index) throws SQLException;
     }
 }

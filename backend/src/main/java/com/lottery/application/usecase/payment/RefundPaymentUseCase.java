@@ -3,6 +3,7 @@ package com.lottery.application.usecase.payment;
 import com.lottery.application.ConflictException;
 import com.lottery.application.NotFoundException;
 import com.lottery.application.UseCaseContext;
+import com.lottery.application.audit.AuditService;
 import com.lottery.application.command.RefundPaymentCommand;
 import com.lottery.application.dto.PaymentDto;
 import com.lottery.application.mapper.PaymentMapper;
@@ -30,6 +31,7 @@ public final class RefundPaymentUseCase {
     private final TransactionManager transactionManager;
     private final DomainClock clock;
     private final PaymentMapper mapper;
+    private final AuditService auditService;
 
     public RefundPaymentUseCase(
             PaymentRepository paymentRepository,
@@ -40,6 +42,28 @@ public final class RefundPaymentUseCase {
             TransactionManager transactionManager,
             DomainClock clock,
             PaymentMapper mapper) {
+        this(
+                paymentRepository,
+                invoiceRepository,
+                ticketRepository,
+                paymentProviderPort,
+                authorizationPort,
+                transactionManager,
+                clock,
+                mapper,
+                null);
+    }
+
+    public RefundPaymentUseCase(
+            PaymentRepository paymentRepository,
+            InvoiceRepository invoiceRepository,
+            TicketRepository ticketRepository,
+            PaymentProviderPort paymentProviderPort,
+            AuthorizationPort authorizationPort,
+            TransactionManager transactionManager,
+            DomainClock clock,
+            PaymentMapper mapper,
+            AuditService auditService) {
         this.paymentRepository = paymentRepository;
         this.invoiceRepository = invoiceRepository;
         this.ticketRepository = ticketRepository;
@@ -48,6 +72,7 @@ public final class RefundPaymentUseCase {
         this.transactionManager = transactionManager;
         this.clock = clock;
         this.mapper = mapper;
+        this.auditService = auditService;
     }
 
     public PaymentDto execute(RefundPaymentCommand command, UseCaseContext context) {
@@ -76,6 +101,9 @@ public final class RefundPaymentUseCase {
             Payment refundedPayment = payment.withStatus(PaymentStatus.REFUNDED, refundedAt);
             paymentRepository.update(refundedPayment);
             ticketRepository.update(ticket.withPaymentStatus(TicketStatus.REFUNDED, refundedAt));
+            if (auditService != null) {
+                auditService.record(context, "PAYMENT_REFUND", "PAYMENT", refundedPayment.id());
+            }
             return mapper.toDto(refundedPayment);
         });
     }

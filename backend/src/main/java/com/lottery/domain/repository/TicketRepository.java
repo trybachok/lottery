@@ -15,4 +15,6 @@ public interface TicketRepository {
     List<Ticket> findAll(int limit, int offset);
 
     List<Ticket> findByUserId(UUID userId, int limit, int offset);
+
+    List<Ticket> findPaidByDrawId(UUID drawId);
 }

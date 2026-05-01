@@ -79,6 +79,28 @@ public final class Ticket {
                 0);
     }
 
+    public Ticket withDrawResult(TicketStatus resultStatus, BigDecimal matchPercent, UUID prizeId, Instant checkedAt) {
+        if (resultStatus != TicketStatus.WIN && resultStatus != TicketStatus.LOSE) {
+            throw new IllegalArgumentException("Ticket result status must be WIN or LOSE");
+        }
+        return new Ticket(
+                id,
+                userId,
+                drawId,
+                resultStatus,
+                combination,
+                price,
+                matchPercent,
+                prizeId,
+                test,
+                createdAt,
+                paidAt,
+                checkedAt,
+                cancelledAt,
+                deletedAt,
+                version);
+    }
+
     public UUID id() {
         return id;
     }

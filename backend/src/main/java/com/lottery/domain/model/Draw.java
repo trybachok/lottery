@@ -104,6 +104,27 @@ public final class Draw {
                 0);
     }
 
+    public Draw withStatus(DrawStatus newStatus, Instant now) {
+        return new Draw(
+                id,
+                title,
+                description,
+                newStatus,
+                managerId,
+                combinationSchemaId,
+                uiThemeId,
+                uiTemplateId,
+                salesStartAt,
+                salesEndAt,
+                drawAt,
+                maxTickets,
+                test,
+                createdAt,
+                now,
+                deletedAt,
+                version);
+    }
+
     public UUID id() {
         return id;
     }

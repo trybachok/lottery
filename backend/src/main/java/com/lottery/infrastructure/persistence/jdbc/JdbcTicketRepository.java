@@ -174,6 +174,18 @@ public final class JdbcTicketRepository implements TicketRepository {
         });
     }
 
+    @Override
+    public List<Ticket> findPaidByDrawId(UUID drawId) {
+        return findMany("""
+                select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
+                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                from tickets
+                where draw_id = ? and status = 'PAID' and cancelled_at is null and deleted_at is null
+                order by created_at asc
+                for update
+                """, statement -> statement.setObject(1, drawId));
+    }
+
     private List<Ticket> findMany(String sql, StatementBinder binder) {
         try {
             Connection connection = connectionProvider.currentConnection();

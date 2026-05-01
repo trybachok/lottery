@@ -124,12 +124,21 @@ public final class JdbcDrawRepository implements DrawRepository {
 
     @Override
     public Optional<Draw> findById(UUID id) {
+        return findById(id, false);
+    }
+
+    @Override
+    public Optional<Draw> findByIdForUpdate(UUID id) {
+        return findById(id, true);
+    }
+
+    private Optional<Draw> findById(UUID id, boolean forUpdate) {
         String sql = """
                 select id, title, description, status, manager_id, combination_schema_id, ui_theme_id, ui_template_id,
                        sales_start_at, sales_end_at, draw_at, max_tickets, is_test, created_at, updated_at, deleted_at, version
                 from draws
                 where id = ? and deleted_at is null
-                """;
+                """ + (forUpdate ? " for update" : "");
         try {
             Connection connection = connectionProvider.currentConnection();
             try (PreparedStatement statement = connection.prepareStatement(sql)) {

@@ -12,5 +12,7 @@ public interface DrawRepository {
 
     Optional<Draw> findById(UUID id);
 
+    Optional<Draw> findByIdForUpdate(UUID id);
+
     List<Draw> findAll(int limit, int offset);
 }

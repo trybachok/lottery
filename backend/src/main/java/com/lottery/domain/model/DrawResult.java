@@ -11,6 +11,7 @@ public record DrawResult(
         UUID drawId,
         Combination winningCombination,
         String algorithmVersion,
+        String randomProvider,
         String proofHash,
         UUID generatedBy,
         Instant generatedAt) {
@@ -19,6 +20,7 @@ public record DrawResult(
         Objects.requireNonNull(drawId, "drawId");
         Objects.requireNonNull(winningCombination, "winningCombination");
         Objects.requireNonNull(algorithmVersion, "algorithmVersion");
+        Objects.requireNonNull(randomProvider, "randomProvider");
         Objects.requireNonNull(generatedAt, "generatedAt");
     }
 

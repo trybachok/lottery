@@ -8,27 +8,36 @@ import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.auth.PasswordHasher;
 import com.lottery.application.usecase.draw.CreateDrawUseCase;
 import com.lottery.application.usecase.draw.ListDrawsUseCase;
+import com.lottery.application.usecase.draw.RunDrawUseCase;
 import com.lottery.application.usecase.auth.LoginByPasswordUseCase;
 import com.lottery.application.usecase.auth.RegisterUserUseCase;
 import com.lottery.application.usecase.ticket.CreateTicketUseCase;
 import com.lottery.application.usecase.ticket.ListTicketsUseCase;
 import com.lottery.application.usecase.user.CreateUserUseCase;
 import com.lottery.domain.policy.TicketPurchasePolicy;
+import com.lottery.domain.policy.DrawStatusTransitionPolicy;
+import com.lottery.domain.repository.CombinationSchemaRepository;
 import com.lottery.domain.repository.DrawRepository;
+import com.lottery.domain.repository.DrawResultRepository;
 import com.lottery.domain.repository.InvoiceRepository;
 import com.lottery.domain.repository.PaymentRepository;
 import com.lottery.domain.repository.RbacRepository;
 import com.lottery.domain.repository.TicketRepository;
 import com.lottery.domain.repository.UserRepository;
+import com.lottery.domain.repository.WinningRuleRepository;
 import com.lottery.domain.service.DomainClock;
+import com.lottery.infrastructure.lottery.JsonCombinationEngine;
 import com.lottery.infrastructure.openapi.OpenApiResource;
+import com.lottery.infrastructure.persistence.jdbc.JdbcCombinationSchemaRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcDrawRepository;
+import com.lottery.infrastructure.persistence.jdbc.JdbcDrawResultRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcInvoiceRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcRbacRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTicketRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTransactionManager;
 import com.lottery.infrastructure.persistence.jdbc.JdbcUserRepository;
+import com.lottery.infrastructure.persistence.jdbc.JdbcWinningRuleRepository;
 import com.lottery.infrastructure.security.BcryptPasswordHasher;
 import com.lottery.infrastructure.security.DatabaseAuthorizationAdapter;
 import com.lottery.infrastructure.security.InMemorySessionTokenService;
@@ -39,6 +48,7 @@ import com.lottery.presentation.rest.ServletUseCaseContextFactory;
 import com.lottery.presentation.rest.auth.LoginServlet;
 import com.lottery.presentation.rest.auth.RegisterServlet;
 import com.lottery.presentation.rest.draw.CreateDrawServlet;
+import com.lottery.presentation.rest.draw.RunDrawServlet;
 import com.lottery.presentation.rest.health.HealthServlet;
 import com.lottery.presentation.rest.health.ReadyServlet;
 import com.lottery.presentation.rest.ticket.CreateTicketServlet;
@@ -66,6 +76,9 @@ public final class ApplicationConfig {
         UserRepository userRepository = new JdbcUserRepository(transactionManager);
         DrawRepository drawRepository = new JdbcDrawRepository(transactionManager);
         TicketRepository ticketRepository = new JdbcTicketRepository(transactionManager, objectMapper);
+        CombinationSchemaRepository combinationSchemaRepository = new JdbcCombinationSchemaRepository(transactionManager);
+        DrawResultRepository drawResultRepository = new JdbcDrawResultRepository(transactionManager, objectMapper);
+        WinningRuleRepository winningRuleRepository = new JdbcWinningRuleRepository(transactionManager);
         InvoiceRepository invoiceRepository = new JdbcInvoiceRepository(transactionManager);
         PaymentRepository paymentRepository = new JdbcPaymentRepository(transactionManager);
         RbacRepository rbacRepository = new JdbcRbacRepository(transactionManager);
@@ -105,6 +118,19 @@ public final class ApplicationConfig {
                 authorizationPort,
                 transactionManager,
                 new DrawMapper());
+        JsonCombinationEngine combinationEngine = new JsonCombinationEngine(objectMapper);
+        RunDrawUseCase runDrawUseCase = new RunDrawUseCase(
+                drawRepository,
+                combinationSchemaRepository,
+                drawResultRepository,
+                ticketRepository,
+                winningRuleRepository,
+                authorizationPort,
+                transactionManager,
+                combinationEngine,
+                combinationEngine,
+                new DrawStatusTransitionPolicy(),
+                clock);
         CreateTicketUseCase createTicketUseCase = new CreateTicketUseCase(
                 userRepository,
                 drawRepository,
@@ -139,6 +165,9 @@ public final class ApplicationConfig {
         context.addServlet(
                 new ServletHolder(new CreateDrawServlet(objectMapper, errorHandler, createDrawUseCase, listDrawsUseCase, contextFactory)),
                 "/api/v1/draws");
+        context.addServlet(
+                new ServletHolder(new RunDrawServlet(objectMapper, errorHandler, runDrawUseCase, contextFactory)),
+                "/api/v1/draws/*");
         context.addServlet(
                 new ServletHolder(
                         new CreateTicketServlet(objectMapper, errorHandler, createTicketUseCase, listTicketsUseCase, contextFactory)),

@@ -125,6 +125,27 @@ public final class Draw {
                 version);
     }
 
+    public Draw withManager(UUID newManagerId, Instant now) {
+        return new Draw(
+                id,
+                title,
+                description,
+                status,
+                newManagerId,
+                combinationSchemaId,
+                uiThemeId,
+                uiTemplateId,
+                salesStartAt,
+                salesEndAt,
+                drawAt,
+                maxTickets,
+                test,
+                createdAt,
+                now,
+                deletedAt,
+                version);
+    }
+
     public UUID id() {
         return id;
     }

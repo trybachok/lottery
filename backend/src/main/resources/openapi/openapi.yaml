@@ -482,6 +482,359 @@ paths:
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      summary: Admin list users
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: adminCreateUser
+      summary: Admin create user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /admin/users/{userId}:
+    get:
+      operationId: adminGetUser
+      summary: Admin get user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/Error'
+    put:
+      operationId: adminUpdateUser
+      summary: Admin update user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    delete:
+      operationId: adminDeleteUser
+      summary: Admin delete user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '204':
+          description: User deleted
+  /admin/users/{userId}/roles:
+    get:
+      operationId: adminListUserRoles
+      summary: Admin list user roles
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      responses:
+        '200':
+          description: User roles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleListResponse'
+    post:
+      operationId: adminAssignUserRole
+      summary: Admin assign role to user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleAssignmentRequest'
+      responses:
+        '204':
+          description: Role assigned
+  /admin/users/{userId}/roles/{roleId}:
+    delete:
+      operationId: adminRemoveUserRole
+      summary: Admin remove role from user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdPath'
+        - $ref: '#/components/parameters/RoleIdPath'
+      responses:
+        '204':
+          description: Role removed
+  /admin/roles:
+    get:
+      operationId: adminListRoles
+      summary: Admin list roles
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Roles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleListResponse'
+    post:
+      operationId: adminCreateRole
+      summary: Admin create role
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+  /admin/roles/{roleId}:
+    get:
+      operationId: adminGetRole
+      summary: Admin get role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleIdPath'
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+    put:
+      operationId: adminUpdateRole
+      summary: Admin update role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+      responses:
+        '200':
+          description: Role updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+    delete:
+      operationId: adminDeleteRole
+      summary: Admin delete role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleIdPath'
+      responses:
+        '204':
+          description: Role deleted
+  /admin/roles/{roleId}/permissions:
+    get:
+      operationId: adminListRolePermissions
+      summary: Admin list role permissions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleIdPath'
+      responses:
+        '200':
+          description: Role permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionListResponse'
+    post:
+      operationId: adminAssignRolePermission
+      summary: Admin assign permission to role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionAssignmentRequest'
+      responses:
+        '204':
+          description: Permission assigned
+  /admin/roles/{roleId}/permissions/{permissionId}:
+    delete:
+      operationId: adminRemoveRolePermission
+      summary: Admin remove permission from role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleIdPath'
+        - $ref: '#/components/parameters/PermissionIdPath'
+      responses:
+        '204':
+          description: Permission removed
+  /admin/permissions:
+    get:
+      operationId: adminListPermissions
+      summary: Admin list permissions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionListResponse'
+    post:
+      operationId: adminCreatePermission
+      summary: Admin create permission
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionRequest'
+      responses:
+        '201':
+          description: Permission created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Permission'
+  /admin/permissions/{permissionId}:
+    get:
+      operationId: adminGetPermission
+      summary: Admin get permission
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PermissionIdPath'
+      responses:
+        '200':
+          description: Permission
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Permission'
+    put:
+      operationId: adminUpdatePermission
+      summary: Admin update permission
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PermissionIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionRequest'
+      responses:
+        '200':
+          description: Permission updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Permission'
+    delete:
+      operationId: adminDeletePermission
+      summary: Admin delete permission
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PermissionIdPath'
+      responses:
+        '204':
+          description: Permission deleted
+  /admin/draws/{drawId}/assign-manager:
+    post:
+      operationId: adminAssignDrawManager
+      summary: Admin assign manager to draw
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignManagerRequest'
+      responses:
+        '200':
+          description: Draw updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
 components:
   securitySchemes:
     bearerAuth:
@@ -492,6 +845,34 @@ components:
     UserIdQuery:
       name: userId
       in: query
+      schema:
+        type: string
+        format: uuid
+    UserIdPath:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RoleIdPath:
+      name: roleId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PermissionIdPath:
+      name: permissionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DrawIdPath:
+      name: drawId
+      in: path
+      required: true
       schema:
         type: string
         format: uuid
@@ -597,6 +978,109 @@ components:
         password:
           type: string
           writeOnly: true
+    AdminUserRequest:
+      type: object
+      required: [email, login]
+      properties:
+        email:
+          type: string
+          format: email
+        login:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+        status:
+          $ref: '#/components/schemas/UserStatus'
+    UserListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    Role:
+      type: object
+      required: [id, code, name, system]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        system:
+          type: boolean
+    RoleRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+    RoleListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+    Permission:
+      type: object
+      required: [id, code]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        description:
+          type: string
+    PermissionRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+    PermissionListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+    RoleAssignmentRequest:
+      type: object
+      required: [roleId]
+      properties:
+        roleId:
+          type: string
+          format: uuid
+    PermissionAssignmentRequest:
+      type: object
+      required: [permissionId]
+      properties:
+        permissionId:
+          type: string
+          format: uuid
+    AssignManagerRequest:
+      type: object
+      required: [managerId]
+      properties:
+        managerId:
+          type: string
+          format: uuid
     RegisterRequest:
       type: object
       required: [email, password]

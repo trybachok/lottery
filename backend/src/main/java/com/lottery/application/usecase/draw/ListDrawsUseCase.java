@@ -8,6 +8,7 @@ import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.application.query.ListDrawsQuery;
 import com.lottery.domain.repository.DrawRepository;
 import com.lottery.domain.valueobject.PermissionCodes;
+import com.lottery.domain.valueobject.RoleCodes;
 import java.util.List;
 
 public final class ListDrawsUseCase {
@@ -30,6 +31,11 @@ public final class ListDrawsUseCase {
     public List<DrawDto> execute(ListDrawsQuery query, UseCaseContext context) {
         return transactionManager.inTransaction(() -> {
             authorizationPort.ensurePermission(context, PermissionCodes.DRAW_READ);
+            if (!authorizationPort.hasRole(context, RoleCodes.ADMIN) && authorizationPort.hasRole(context, RoleCodes.MANAGER)) {
+                return drawRepository.findReport(null, context.actorUserId(), null, null, null, query.limit(), query.offset()).stream()
+                        .map(mapper::toDto)
+                        .toList();
+            }
             return drawRepository.findAll(query.limit(), query.offset()).stream().map(mapper::toDto).toList();
         });
     }

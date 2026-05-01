@@ -163,11 +163,36 @@ public final class JdbcUserRepository implements UserRepository {
         return exists("select 1 from users where login = ? and deleted_at is null", login);
     }
 
+    @Override
+    public boolean existsByEmailExceptId(String email, UUID id) {
+        return existsExceptId("select 1 from users where email = ? and id <> ? and deleted_at is null", email, id);
+    }
+
+    @Override
+    public boolean existsByLoginExceptId(String login, UUID id) {
+        return existsExceptId("select 1 from users where login = ? and id <> ? and deleted_at is null", login, id);
+    }
+
     private boolean exists(String sql, String value) {
         try {
             Connection connection = connectionProvider.currentConnection();
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 statement.setString(1, value);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    return resultSet.next();
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to check user uniqueness", exception);
+        }
+    }
+
+    private boolean existsExceptId(String sql, String value, UUID id) {
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, value);
+                statement.setObject(2, id);
                 try (ResultSet resultSet = statement.executeQuery()) {
                     return resultSet.next();
                 }

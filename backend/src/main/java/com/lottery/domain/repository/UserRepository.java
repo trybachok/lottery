@@ -19,4 +19,12 @@ public interface UserRepository {
     boolean existsByEmail(String email);
 
     boolean existsByLogin(String login);
+
+    default boolean existsByEmailExceptId(String email, UUID id) {
+        return existsByEmail(email);
+    }
+
+    default boolean existsByLoginExceptId(String login, UUID id) {
+        return existsByLogin(login);
+    }
 }

@@ -11,7 +11,9 @@ import com.lottery.application.mapper.UserMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.auth.PasswordHasher;
 import com.lottery.application.usecase.audit.ListAuditLogsUseCase;
+import com.lottery.application.usecase.admin.AdminRbacUseCase;
 import com.lottery.application.usecase.draw.CreateDrawUseCase;
+import com.lottery.application.usecase.draw.AssignDrawManagerUseCase;
 import com.lottery.application.usecase.draw.ListDrawsUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
 import com.lottery.application.usecase.auth.LoginByPasswordUseCase;
@@ -60,6 +62,10 @@ import com.lottery.presentation.error.GlobalErrorHandler;
 import com.lottery.presentation.middleware.RequestContextFilter;
 import com.lottery.presentation.rest.OpenApiServlet;
 import com.lottery.presentation.rest.ServletUseCaseContextFactory;
+import com.lottery.presentation.rest.admin.AdminPermissionsServlet;
+import com.lottery.presentation.rest.admin.AdminRolesServlet;
+import com.lottery.presentation.rest.admin.AdminUsersServlet;
+import com.lottery.presentation.rest.admin.AssignDrawManagerServlet;
 import com.lottery.presentation.rest.audit.AuditLogsServlet;
 import com.lottery.presentation.rest.auth.LoginServlet;
 import com.lottery.presentation.rest.auth.RegisterServlet;
@@ -217,6 +223,24 @@ public final class ApplicationConfig {
                 authorizationPort,
                 transactionManager,
                 new AuditLogMapper());
+        AdminRbacUseCase adminRbacUseCase = new AdminRbacUseCase(
+                userRepository,
+                rbacRepository,
+                authorizationPort,
+                passwordHasher,
+                transactionManager,
+                clock,
+                new UserMapper(),
+                auditService);
+        AssignDrawManagerUseCase assignDrawManagerUseCase = new AssignDrawManagerUseCase(
+                drawRepository,
+                userRepository,
+                rbacRepository,
+                authorizationPort,
+                transactionManager,
+                clock,
+                new DrawMapper(),
+                auditService);
 
         ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService, rbacRepository);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
@@ -264,6 +288,18 @@ public final class ApplicationConfig {
         context.addServlet(
                 new ServletHolder(new AuditLogsServlet(objectMapper, errorHandler, listAuditLogsUseCase, contextFactory)),
                 "/api/v1/admin/audit-logs");
+        context.addServlet(
+                new ServletHolder(new AdminUsersServlet(objectMapper, errorHandler, adminRbacUseCase, contextFactory)),
+                "/api/v1/admin/users/*");
+        context.addServlet(
+                new ServletHolder(new AdminRolesServlet(objectMapper, errorHandler, adminRbacUseCase, contextFactory)),
+                "/api/v1/admin/roles/*");
+        context.addServlet(
+                new ServletHolder(new AdminPermissionsServlet(objectMapper, errorHandler, adminRbacUseCase, contextFactory)),
+                "/api/v1/admin/permissions/*");
+        context.addServlet(
+                new ServletHolder(new AssignDrawManagerServlet(objectMapper, errorHandler, assignDrawManagerUseCase, contextFactory)),
+                "/api/v1/admin/draws/*");
 
         Server server = new Server(properties.httpPort());
         server.setHandler(context);

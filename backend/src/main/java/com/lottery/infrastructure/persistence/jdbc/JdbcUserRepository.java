@@ -3,11 +3,14 @@ package com.lottery.infrastructure.persistence.jdbc;
 import com.lottery.domain.model.User;
 import com.lottery.domain.repository.UserRepository;
 import com.lottery.domain.valueobject.UserStatus;
+import com.lottery.application.OptimisticLockException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,6 +48,44 @@ public final class JdbcUserRepository implements UserRepository {
     }
 
     @Override
+    public User update(User user) {
+        String sql = """
+                update users
+                set email = ?, login = ?, password_hash = ?, status = ?, updated_at = ?, deleted_at = ?, version = version + 1
+                where id = ? and version = ?
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, user.email());
+                statement.setString(2, user.login());
+                statement.setString(3, user.passwordHash().orElse(null));
+                statement.setString(4, user.status().name());
+                JdbcSupport.setInstant(statement, 5, user.updatedAt());
+                JdbcSupport.setInstant(statement, 6, user.deletedAt().orElse(null));
+                statement.setObject(7, user.id());
+                statement.setLong(8, user.version());
+                int updated = statement.executeUpdate();
+                if (updated != 1) {
+                    throw new OptimisticLockException("User");
+                }
+                return new User(
+                        user.id(),
+                        user.email(),
+                        user.login(),
+                        user.passwordHash().orElse(null),
+                        user.status(),
+                        user.createdAt(),
+                        user.updatedAt(),
+                        user.deletedAt().orElse(null),
+                        user.version() + 1);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to update user", exception);
+        }
+    }
+
+    @Override
     public Optional<User> findById(UUID id) {
         String sql = """
                 select id, email, login, password_hash, status, created_at, updated_at, deleted_at, version
@@ -61,6 +102,54 @@ public final class JdbcUserRepository implements UserRepository {
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("Failed to find user", exception);
+        }
+    }
+
+    @Override
+    public Optional<User> findByEmailOrLogin(String loginOrEmail) {
+        String sql = """
+                select id, email, login, password_hash, status, created_at, updated_at, deleted_at, version
+                from users
+                where deleted_at is null and (email = ? or login = ?)
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, loginOrEmail);
+                statement.setString(2, loginOrEmail);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    return resultSet.next() ? Optional.of(map(resultSet)) : Optional.empty();
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to find user by login or email", exception);
+        }
+    }
+
+    @Override
+    public List<User> findAll(int limit, int offset) {
+        String sql = """
+                select id, email, login, password_hash, status, created_at, updated_at, deleted_at, version
+                from users
+                where deleted_at is null
+                order by created_at desc
+                limit ? offset ?
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setInt(1, limit);
+                statement.setInt(2, offset);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<User> users = new ArrayList<>();
+                    while (resultSet.next()) {
+                        users.add(map(resultSet));
+                    }
+                    return users;
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to list users", exception);
         }
     }
 

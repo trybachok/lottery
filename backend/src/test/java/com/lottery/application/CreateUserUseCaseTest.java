@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.lottery.application.command.CreateUserCommand;
 import com.lottery.application.mapper.UserMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
+import com.lottery.application.port.auth.PasswordHasher;
 import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.application.usecase.user.CreateUserUseCase;
 import com.lottery.domain.model.User;
@@ -14,6 +15,7 @@ import com.lottery.domain.service.DomainClock;
 import com.lottery.domain.valueobject.PermissionCodes;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -27,7 +29,7 @@ final class CreateUserUseCaseTest {
         CreateUserUseCase useCase = new CreateUserUseCase(
                 repository,
                 requirePermission(),
-                raw -> "hash:" + raw,
+                testPasswordHasher(),
                 directTransaction(),
                 fixedClock(),
                 new UserMapper());
@@ -47,7 +49,7 @@ final class CreateUserUseCaseTest {
         CreateUserUseCase useCase = new CreateUserUseCase(
                 repository,
                 requirePermission(),
-                raw -> "hash:" + raw,
+                testPasswordHasher(),
                 directTransaction(),
                 fixedClock(),
                 new UserMapper());
@@ -60,9 +62,31 @@ final class CreateUserUseCaseTest {
     }
 
     private static AuthorizationPort requirePermission() {
-        return (context, permissionCode) -> {
-            if (!context.permissions().contains(permissionCode)) {
-                throw new ForbiddenException(permissionCode);
+        return new AuthorizationPort() {
+            @Override
+            public void ensurePermission(UseCaseContext context, String permissionCode) {
+                if (!context.permissions().contains(permissionCode)) {
+                    throw new ForbiddenException(permissionCode);
+                }
+            }
+
+            @Override
+            public boolean hasRole(UseCaseContext context, String roleCode) {
+                return false;
+            }
+        };
+    }
+
+    private static PasswordHasher testPasswordHasher() {
+        return new PasswordHasher() {
+            @Override
+            public String hash(String rawPassword) {
+                return "hash:" + rawPassword;
+            }
+
+            @Override
+            public boolean verify(String rawPassword, String passwordHash) {
+                return ("hash:" + rawPassword).equals(passwordHash);
             }
         };
     }
@@ -93,8 +117,26 @@ final class CreateUserUseCaseTest {
         }
 
         @Override
+        public User update(User user) {
+            users.put(user.id(), user);
+            return user;
+        }
+
+        @Override
         public Optional<User> findById(UUID id) {
             return Optional.ofNullable(users.get(id));
+        }
+
+        @Override
+        public Optional<User> findByEmailOrLogin(String loginOrEmail) {
+            return users.values().stream()
+                    .filter(user -> user.email().equals(loginOrEmail) || user.login().equals(loginOrEmail))
+                    .findFirst();
+        }
+
+        @Override
+        public List<User> findAll(int limit, int offset) {
+            return users.values().stream().skip(offset).limit(limit).toList();
         }
 
         @Override

@@ -5,6 +5,7 @@ import com.lottery.application.ApplicationException;
 import com.lottery.application.ConflictException;
 import com.lottery.application.ForbiddenException;
 import com.lottery.application.NotFoundException;
+import com.lottery.application.UnauthorizedException;
 import com.lottery.application.ValidationException;
 import com.lottery.presentation.middleware.RequestContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +40,9 @@ public final class GlobalErrorHandler {
     private ErrorMapping map(Exception exception) {
         if (exception instanceof ForbiddenException applicationException) {
             return new ErrorMapping(403, applicationException.code(), applicationException.getMessage(), applicationException.details());
+        }
+        if (exception instanceof UnauthorizedException applicationException) {
+            return new ErrorMapping(401, applicationException.code(), applicationException.getMessage(), applicationException.details());
         }
         if (exception instanceof NotFoundException applicationException) {
             return new ErrorMapping(404, applicationException.code(), applicationException.getMessage(), applicationException.details());

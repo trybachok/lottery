@@ -1,35 +1,22 @@
 package com.lottery.presentation.rest;
 
 import com.lottery.application.UseCaseContext;
+import com.lottery.application.port.auth.TokenVerifierPort;
 import com.lottery.presentation.middleware.RequestContext;
 import jakarta.servlet.http.HttpServletRequest;
-import java.util.Arrays;
 import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 public final class ServletUseCaseContextFactory {
+    private final TokenVerifierPort tokenVerifierPort;
+
+    public ServletUseCaseContextFactory(TokenVerifierPort tokenVerifierPort) {
+        this.tokenVerifierPort = tokenVerifierPort;
+    }
+
     public UseCaseContext from(HttpServletRequest request) {
-        UUID actorUserId = optionalUuid(request.getHeader("X-Actor-User-Id"));
-        Set<String> permissions = permissions(request.getHeader("X-Permissions"));
-        return new UseCaseContext(actorUserId, permissions, requestId(request));
-    }
-
-    private UUID optionalUuid(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return UUID.fromString(value);
-    }
-
-    private Set<String> permissions(String value) {
-        if (value == null || value.isBlank()) {
-            return Set.of();
-        }
-        return Arrays.stream(value.split(","))
-                .map(String::trim)
-                .filter(permission -> !permission.isBlank())
-                .collect(Collectors.toUnmodifiableSet());
+        String token = bearerToken(request);
+        TokenVerifierPort.AuthenticatedPrincipal principal = tokenVerifierPort.verify(token);
+        return new UseCaseContext(principal.userId(), Set.of(), requestId(request));
     }
 
     private String requestId(HttpServletRequest request) {
@@ -38,5 +25,13 @@ public final class ServletUseCaseContextFactory {
             return requestContext.requestId();
         }
         return "req_unknown";
+    }
+
+    private String bearerToken(HttpServletRequest request) {
+        String authorization = request.getHeader("Authorization");
+        if (authorization == null || !authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
+            return null;
+        }
+        return authorization.substring(7).trim();
     }
 }

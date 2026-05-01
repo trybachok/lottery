@@ -1,55 +1,53 @@
-package com.lottery.application.usecase.user;
+package com.lottery.application.usecase.auth;
 
 import com.lottery.application.ConflictException;
-import com.lottery.application.UseCaseContext;
-import com.lottery.application.command.CreateUserCommand;
+import com.lottery.application.command.RegisterUserCommand;
 import com.lottery.application.dto.UserDto;
 import com.lottery.application.mapper.UserMapper;
-import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.auth.PasswordHasher;
 import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.domain.model.User;
+import com.lottery.domain.repository.RbacRepository;
 import com.lottery.domain.repository.UserRepository;
 import com.lottery.domain.service.DomainClock;
-import com.lottery.domain.valueobject.PermissionCodes;
+import com.lottery.domain.valueobject.RoleCodes;
 
-public final class CreateUserUseCase {
+public final class RegisterUserUseCase {
     private final UserRepository userRepository;
-    private final AuthorizationPort authorizationPort;
+    private final RbacRepository rbacRepository;
     private final PasswordHasher passwordHasher;
     private final TransactionManager transactionManager;
     private final DomainClock clock;
     private final UserMapper mapper;
 
-    public CreateUserUseCase(
+    public RegisterUserUseCase(
             UserRepository userRepository,
-            AuthorizationPort authorizationPort,
+            RbacRepository rbacRepository,
             PasswordHasher passwordHasher,
             TransactionManager transactionManager,
             DomainClock clock,
             UserMapper mapper) {
         this.userRepository = userRepository;
-        this.authorizationPort = authorizationPort;
+        this.rbacRepository = rbacRepository;
         this.passwordHasher = passwordHasher;
         this.transactionManager = transactionManager;
         this.clock = clock;
         this.mapper = mapper;
     }
 
-    public UserDto execute(CreateUserCommand command, UseCaseContext context) {
+    public UserDto execute(RegisterUserCommand command) {
         return transactionManager.inTransaction(() -> {
-            authorizationPort.ensurePermission(context, PermissionCodes.USER_CREATE);
+            String login = command.login() == null ? command.email() : command.login();
             if (userRepository.existsByEmail(command.email())) {
                 throw new ConflictException("USER_EMAIL_ALREADY_EXISTS", "User email already exists");
             }
-            if (userRepository.existsByLogin(command.login())) {
+            if (userRepository.existsByLogin(login)) {
                 throw new ConflictException("USER_LOGIN_ALREADY_EXISTS", "User login already exists");
             }
-            String passwordHash = command.rawPassword() == null || command.rawPassword().isBlank()
-                    ? null
-                    : passwordHasher.hash(command.rawPassword());
-            User user = User.create(command.email(), command.login(), passwordHash, clock.now());
-            return mapper.toDto(userRepository.save(user));
+            User user = User.create(command.email(), login, passwordHasher.hash(command.rawPassword()), clock.now());
+            User saved = userRepository.save(user);
+            rbacRepository.assignRoleByCode(saved.id(), RoleCodes.CLIENT);
+            return mapper.toDto(saved);
         });
     }
 }

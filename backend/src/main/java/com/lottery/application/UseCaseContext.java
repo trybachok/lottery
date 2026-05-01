@@ -7,4 +7,8 @@ public record UseCaseContext(UUID actorUserId, Set<String> permissions, String r
     public UseCaseContext {
         permissions = permissions == null ? Set.of() : Set.copyOf(permissions);
     }
+
+    public static UseCaseContext anonymous(String requestId) {
+        return new UseCaseContext(null, Set.of(), requestId);
+    }
 }

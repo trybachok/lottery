@@ -20,4 +20,12 @@ public final class BcryptPasswordHasher implements PasswordHasher {
         }
         return BCrypt.withDefaults().hashToString(cost, rawPassword.toCharArray());
     }
+
+    @Override
+    public boolean verify(String rawPassword, String passwordHash) {
+        if (rawPassword == null || rawPassword.isBlank() || passwordHash == null || passwordHash.isBlank()) {
+            return false;
+        }
+        return BCrypt.verifyer().verify(rawPassword.toCharArray(), passwordHash).verified;
+    }
 }

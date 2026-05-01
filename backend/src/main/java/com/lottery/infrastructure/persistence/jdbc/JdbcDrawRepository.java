@@ -1,5 +1,6 @@
 package com.lottery.infrastructure.persistence.jdbc;
 
+import com.lottery.application.OptimisticLockException;
 import com.lottery.domain.model.Draw;
 import com.lottery.domain.repository.DrawRepository;
 import com.lottery.domain.valueobject.DrawStatus;
@@ -8,6 +9,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -60,6 +63,66 @@ public final class JdbcDrawRepository implements DrawRepository {
     }
 
     @Override
+    public Draw update(Draw draw) {
+        String sql = """
+                update draws
+                set title = ?, description = ?, status = ?, manager_id = ?, combination_schema_id = ?,
+                    ui_theme_id = ?, ui_template_id = ?, sales_start_at = ?, sales_end_at = ?, draw_at = ?,
+                    max_tickets = ?, is_test = ?, updated_at = ?, deleted_at = ?, version = version + 1
+                where id = ? and version = ?
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, draw.title());
+                statement.setString(2, draw.description());
+                statement.setString(3, draw.status().name());
+                statement.setObject(4, draw.managerId().orElse(null));
+                statement.setObject(5, draw.combinationSchemaId());
+                statement.setObject(6, draw.uiThemeId().orElse(null));
+                statement.setObject(7, draw.uiTemplateId().orElse(null));
+                JdbcSupport.setInstant(statement, 8, draw.salesStartAt());
+                JdbcSupport.setInstant(statement, 9, draw.salesEndAt());
+                JdbcSupport.setInstant(statement, 10, draw.drawAt());
+                if (draw.maxTickets().isPresent()) {
+                    statement.setInt(11, draw.maxTickets().get());
+                } else {
+                    statement.setObject(11, null);
+                }
+                statement.setBoolean(12, draw.test());
+                JdbcSupport.setInstant(statement, 13, draw.updatedAt());
+                JdbcSupport.setInstant(statement, 14, draw.deletedAt().orElse(null));
+                statement.setObject(15, draw.id());
+                statement.setLong(16, draw.version());
+                int updated = statement.executeUpdate();
+                if (updated != 1) {
+                    throw new OptimisticLockException("Draw");
+                }
+                return new Draw(
+                        draw.id(),
+                        draw.title(),
+                        draw.description(),
+                        draw.status(),
+                        draw.managerId().orElse(null),
+                        draw.combinationSchemaId(),
+                        draw.uiThemeId().orElse(null),
+                        draw.uiTemplateId().orElse(null),
+                        draw.salesStartAt(),
+                        draw.salesEndAt(),
+                        draw.drawAt(),
+                        draw.maxTickets().orElse(null),
+                        draw.test(),
+                        draw.createdAt(),
+                        draw.updatedAt(),
+                        draw.deletedAt().orElse(null),
+                        draw.version() + 1);
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to update draw", exception);
+        }
+    }
+
+    @Override
     public Optional<Draw> findById(UUID id) {
         String sql = """
                 select id, title, description, status, manager_id, combination_schema_id, ui_theme_id, ui_template_id,
@@ -77,6 +140,34 @@ public final class JdbcDrawRepository implements DrawRepository {
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("Failed to find draw", exception);
+        }
+    }
+
+    @Override
+    public List<Draw> findAll(int limit, int offset) {
+        String sql = """
+                select id, title, description, status, manager_id, combination_schema_id, ui_theme_id, ui_template_id,
+                       sales_start_at, sales_end_at, draw_at, max_tickets, is_test, created_at, updated_at, deleted_at, version
+                from draws
+                where deleted_at is null
+                order by created_at desc
+                limit ? offset ?
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setInt(1, limit);
+                statement.setInt(2, offset);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<Draw> draws = new ArrayList<>();
+                    while (resultSet.next()) {
+                        draws.add(map(resultSet));
+                    }
+                    return draws;
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to list draws", exception);
         }
     }
 

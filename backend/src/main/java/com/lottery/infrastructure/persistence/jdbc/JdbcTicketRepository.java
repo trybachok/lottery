@@ -3,6 +3,7 @@ package com.lottery.infrastructure.persistence.jdbc;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lottery.application.OptimisticLockException;
 import com.lottery.domain.model.Ticket;
 import com.lottery.domain.repository.TicketRepository;
 import com.lottery.domain.valueobject.Combination;
@@ -13,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Currency;
 import java.util.List;
 import java.util.Optional;
@@ -67,6 +69,60 @@ public final class JdbcTicketRepository implements TicketRepository {
     }
 
     @Override
+    public Ticket update(Ticket ticket) {
+        String sql = """
+                update tickets
+                set user_id = ?, draw_id = ?, status = ?, combination_json = ?::jsonb, price_amount = ?,
+                    price_currency = ?, match_percent = ?, prize_id = ?, is_test = ?, paid_at = ?,
+                    participated_at = ?, checked_at = ?, cancelled_at = ?, deleted_at = ?, version = version + 1
+                where id = ? and version = ?
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, ticket.userId());
+                statement.setObject(2, ticket.drawId());
+                statement.setString(3, ticket.status().name());
+                statement.setString(4, objectMapper.writeValueAsString(ticket.combination().values()));
+                statement.setBigDecimal(5, ticket.price().amount());
+                statement.setString(6, ticket.price().currency().getCurrencyCode());
+                statement.setBigDecimal(7, ticket.matchPercent().orElse(null));
+                statement.setObject(8, ticket.prizeId().orElse(null));
+                statement.setBoolean(9, ticket.test());
+                JdbcSupport.setInstant(statement, 10, ticket.paidAt().orElse(null));
+                JdbcSupport.setInstant(statement, 11, null);
+                JdbcSupport.setInstant(statement, 12, ticket.checkedAt().orElse(null));
+                JdbcSupport.setInstant(statement, 13, ticket.cancelledAt().orElse(null));
+                JdbcSupport.setInstant(statement, 14, ticket.deletedAt().orElse(null));
+                statement.setObject(15, ticket.id());
+                statement.setLong(16, ticket.version());
+                int updated = statement.executeUpdate();
+                if (updated != 1) {
+                    throw new OptimisticLockException("Ticket");
+                }
+                return new Ticket(
+                        ticket.id(),
+                        ticket.userId(),
+                        ticket.drawId(),
+                        ticket.status(),
+                        ticket.combination(),
+                        ticket.price(),
+                        ticket.matchPercent().orElse(null),
+                        ticket.prizeId().orElse(null),
+                        ticket.test(),
+                        ticket.createdAt(),
+                        ticket.paidAt().orElse(null),
+                        ticket.checkedAt().orElse(null),
+                        ticket.cancelledAt().orElse(null),
+                        ticket.deletedAt().orElse(null),
+                        ticket.version() + 1);
+            }
+        } catch (SQLException | JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to update ticket", exception);
+        }
+    }
+
+    @Override
     public Optional<Ticket> findById(UUID id) {
         String sql = """
                 select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
@@ -84,6 +140,55 @@ public final class JdbcTicketRepository implements TicketRepository {
             }
         } catch (SQLException | JsonProcessingException exception) {
             throw new IllegalStateException("Failed to find ticket", exception);
+        }
+    }
+
+    @Override
+    public List<Ticket> findAll(int limit, int offset) {
+        return findMany("""
+                select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
+                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                from tickets
+                where deleted_at is null
+                order by created_at desc
+                limit ? offset ?
+                """, statement -> {
+            statement.setInt(1, limit);
+            statement.setInt(2, offset);
+        });
+    }
+
+    @Override
+    public List<Ticket> findByUserId(UUID userId, int limit, int offset) {
+        return findMany("""
+                select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
+                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                from tickets
+                where user_id = ? and deleted_at is null
+                order by created_at desc
+                limit ? offset ?
+                """, statement -> {
+            statement.setObject(1, userId);
+            statement.setInt(2, limit);
+            statement.setInt(3, offset);
+        });
+    }
+
+    private List<Ticket> findMany(String sql, StatementBinder binder) {
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                binder.bind(statement);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<Ticket> tickets = new ArrayList<>();
+                    while (resultSet.next()) {
+                        tickets.add(map(resultSet));
+                    }
+                    return tickets;
+                }
+            }
+        } catch (SQLException | JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to list tickets", exception);
         }
     }
 
@@ -109,5 +214,10 @@ public final class JdbcTicketRepository implements TicketRepository {
                 cancelledAt == null ? null : cancelledAt.toInstant(),
                 deletedAt == null ? null : deletedAt.toInstant(),
                 resultSet.getLong("version"));
+    }
+
+    @FunctionalInterface
+    private interface StatementBinder {
+        void bind(PreparedStatement statement) throws SQLException;
     }
 }

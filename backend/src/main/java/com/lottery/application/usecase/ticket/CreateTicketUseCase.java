@@ -49,8 +49,8 @@ public final class CreateTicketUseCase {
     }
 
     public TicketDto execute(CreateTicketCommand command, UseCaseContext context) {
-        authorizationPort.ensurePermission(context, PermissionCodes.TICKET_CREATE);
         return transactionManager.inTransaction(() -> {
+            authorizationPort.ensurePermission(context, PermissionCodes.TICKET_CREATE);
             userRepository.findById(command.userId()).orElseThrow(() -> new NotFoundException("User"));
             Draw draw = drawRepository.findById(command.drawId()).orElseThrow(() -> new NotFoundException("Draw"));
             if (!ticketPurchasePolicy.canCreateTicketFor(draw, command.test())) {

@@ -56,25 +56,24 @@ const routes: RouteRecordRaw[] = [
             },
             {
                 path: 'users',
-                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
-                props: {
-                    title: 'Users',
-                    description: 'User management tools will be implemented in the admin users phase.',
-                },
+                component: () => import('@/pages/admin/sections/AdminUsersPage.vue'),
                 meta: {
                     permissions: ['user.manage'],
                 },
             },
             {
                 path: 'roles',
-                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
-                props: {
-                    title: 'Roles and permissions',
-                    description: 'Role and permission management tools will be implemented in the RBAC phase.',
-                },
+                component: () => import('@/pages/admin/sections/AdminRolesPage.vue'),
                 meta: {
                     permissions: ['role.manage', 'permission.manage'],
                     permissionMode: 'any',
+                },
+            },
+            {
+                path: 'permissions',
+                component: () => import('@/pages/admin/sections/AdminPermissionsPage.vue'),
+                meta: {
+                    permissions: ['permission.manage'],
                 },
             },
             {

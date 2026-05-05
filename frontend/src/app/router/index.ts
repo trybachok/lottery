@@ -86,11 +86,7 @@ const routes: RouteRecordRaw[] = [
             },
             {
                 path: 'reports',
-                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
-                props: {
-                    title: 'Reports',
-                    description: 'Draw and ticket reports will be implemented in the reports phase.',
-                },
+                component: () => import('@/pages/admin/sections/AdminReportsPage.vue'),
                 meta: {
                     permissions: ['report.draw.export', 'report.ticket.export'],
                     permissionMode: 'any',
@@ -98,11 +94,7 @@ const routes: RouteRecordRaw[] = [
             },
             {
                 path: 'audit-logs',
-                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
-                props: {
-                    title: 'Audit logs',
-                    description: 'Administrative audit log browsing will be implemented in the audit phase.',
-                },
+                component: () => import('@/pages/admin/sections/AdminAuditLogsPage.vue'),
                 meta: {
                     permissions: ['audit.read'],
                 },

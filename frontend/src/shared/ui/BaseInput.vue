@@ -28,7 +28,7 @@ defineEmits<{
       :disabled="disabled"
       :autocomplete="autocomplete"
       :aria-invalid="Boolean(error)"
-      :aria-describedby="error ? `${id}-error` : undefined"
+      :aria-describedby="error && id ? `${id}-error` : undefined"
       @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
     />
     <span v-if="error" :id="id ? `${id}-error` : undefined" class="base-input__error">

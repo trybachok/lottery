@@ -1,10 +1,26 @@
 <script setup lang="ts">
-import BaseCard from '@/shared/ui/BaseCard.vue'
+import { onMounted } from 'vue'
+import AppErrorMessage from '@/shared/ui/AppErrorMessage.vue'
+import AppLoader from '@/shared/ui/AppLoader.vue'
+import DrawList from '@/features/draws/ui/DrawList.vue'
+import { useDrawsStore } from '@/features/draws/model/draws.store'
+
+const drawsStore = useDrawsStore()
+
+onMounted(() => {
+  void drawsStore.loadDraws()
+})
 </script>
 
 <template>
   <main class="draws-page">
-    <BaseCard title="Draws" description="Available lottery draws will appear here." />
+    <AppLoader v-if="drawsStore.isLoading" label="Loading draws..." />
+    <AppErrorMessage
+      v-else-if="drawsStore.error"
+      title="Could not load draws"
+      :message="drawsStore.error.message"
+    />
+    <DrawList v-else :draws="drawsStore.items" />
   </main>
 </template>
 

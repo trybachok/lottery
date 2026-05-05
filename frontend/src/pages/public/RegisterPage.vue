@@ -11,7 +11,7 @@ const router = useRouter()
 async function register(credentials: RegisterCredentials): Promise<void> {
   try {
     await authStore.register(credentials)
-    await router.push('/draws')
+    await router.push('/account')
   } catch {
     // The store exposes the normalized API error to the form.
   }

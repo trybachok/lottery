@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="TRow extends Record<string, unknown>">
 export type BaseTableColumn<TRow> = {
-  key: keyof TRow & string
+  key: (keyof TRow & string) | string
   label: string
   align?: 'left' | 'right' | 'center'
 }
@@ -25,8 +25,8 @@ defineProps<{
       <tbody>
         <tr v-for="(row, rowIndex) in rows" :key="String(row.id ?? rowIndex)">
           <td v-for="column in columns" :key="column.key" :class="`base-table__cell--${column.align ?? 'left'}`">
-            <slot :name="column.key" :row="row" :value="row[column.key]">
-              {{ row[column.key] }}
+            <slot :name="column.key" :row="row" :value="row[column.key as keyof TRow]">
+              {{ row[column.key as keyof TRow] }}
             </slot>
           </td>
         </tr>

@@ -1,20 +1,26 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import BaseCard from '@/shared/ui/BaseCard.vue'
 import LoginForm from '@/features/auth/ui/LoginForm.vue'
 import { useAuthStore } from '@/features/auth/model/auth.store'
 import type { LoginCredentials } from '@/features/auth/api/auth.api'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 async function login(credentials: LoginCredentials): Promise<void> {
   try {
     await authStore.login(credentials)
-    await router.push('/draws')
+    await router.push(resolveRedirectPath())
   } catch {
     // The store exposes the normalized API error to the form.
   }
+}
+
+function resolveRedirectPath(): string {
+  const redirect = route.query.redirect
+  return typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/account'
 }
 </script>
 

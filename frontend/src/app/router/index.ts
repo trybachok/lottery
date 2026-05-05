@@ -79,13 +79,9 @@ const routes: RouteRecordRaw[] = [
             },
             {
                 path: 'draws',
-                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
-                props: {
-                    title: 'Draw management',
-                    description: 'Draw creation, manager assignment and run controls will be implemented next.',
-                },
+                component: () => import('@/pages/admin/sections/AdminDrawsPage.vue'),
                 meta: {
-                    permissions: ['draw.create', 'draw.run'],
+                    permissions: ['draw.create', 'draw.update', 'draw.run'],
                     permissionMode: 'any',
                 },
             },

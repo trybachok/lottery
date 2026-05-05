@@ -28,7 +28,7 @@ export const adminNavigationItems: AdminNavigationItem[] = [
   {
     label: 'Draws',
     to: '/admin/draws',
-    permissions: ['draw.create', 'draw.run'],
+    permissions: ['draw.create', 'draw.update', 'draw.run'],
     permissionMode: 'any',
   },
   {

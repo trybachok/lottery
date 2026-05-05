@@ -17,10 +17,12 @@ import {
 } from '../api/auth.api'
 
 const userStorageKey = 'lottery.auth.user'
+const permissionsStorageKey = 'lottery.auth.permissions'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(getAccessToken())
   const user = ref<User | null>(readStoredUser())
+  const permissions = ref<string[]>(readStoredPermissions())
   const isLoading = ref(false)
   const error = ref<FrontendApiError | null>(null)
 
@@ -29,6 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
   function restoreSession(): void {
     accessToken.value = getAccessToken()
     user.value = readStoredUser()
+    permissions.value = readStoredPermissions()
 
     if (!accessToken.value || !user.value) {
       clearSession()
@@ -89,16 +92,20 @@ export const useAuthStore = defineStore('auth', () => {
   function persistAuthResponse(authResponse: AuthResponse): void {
     accessToken.value = authResponse.accessToken
     user.value = authResponse.user
+    permissions.value = extractPermissions(authResponse)
     setAccessToken(authResponse.accessToken)
     writeStoredUser(authResponse.user)
+    writeStoredPermissions(permissions.value)
   }
 
   function clearSession(): void {
     accessToken.value = null
     user.value = null
+    permissions.value = []
     error.value = null
     clearAccessToken()
     removeStoredUser()
+    removeStoredPermissions()
   }
 
   setUnauthorizedHandler(() => {
@@ -108,6 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     accessToken,
     user,
+    permissions,
     isLoading,
     error,
     isAuthenticated,
@@ -140,6 +148,49 @@ function writeStoredUser(user: User): void {
 
 function removeStoredUser(): void {
   getStorage()?.removeItem(userStorageKey)
+}
+
+function readStoredPermissions(): string[] {
+  const rawPermissions = getStorage()?.getItem(permissionsStorageKey)
+
+  if (!rawPermissions) {
+    return []
+  }
+
+  try {
+    const parsedPermissions = JSON.parse(rawPermissions) as unknown
+    return Array.isArray(parsedPermissions) ? parsedPermissions.filter(isString) : []
+  } catch {
+    removeStoredPermissions()
+    return []
+  }
+}
+
+function writeStoredPermissions(permissions: string[]): void {
+  getStorage()?.setItem(permissionsStorageKey, JSON.stringify(permissions))
+}
+
+function removeStoredPermissions(): void {
+  getStorage()?.removeItem(permissionsStorageKey)
+}
+
+function extractPermissions(authResponse: AuthResponse): string[] {
+  const responsePermissions = (authResponse as unknown as { permissions?: unknown }).permissions
+  const userPermissions = (authResponse.user as unknown as { permissions?: unknown }).permissions
+
+  if (Array.isArray(responsePermissions)) {
+    return responsePermissions.filter(isString)
+  }
+
+  if (Array.isArray(userPermissions)) {
+    return userPermissions.filter(isString)
+  }
+
+  return []
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
 }
 
 function getStorage(): Storage | undefined {

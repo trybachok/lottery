@@ -17,11 +17,13 @@ import {
 } from '../api/auth.api'
 
 const userStorageKey = 'lottery.auth.user'
+const roleCodesStorageKey = 'lottery.auth.roleCodes'
 const permissionsStorageKey = 'lottery.auth.permissions'
 
 export const useAuthStore = defineStore('auth', () => {
   const accessToken = ref<string | null>(getAccessToken())
   const user = ref<User | null>(readStoredUser())
+  const roleCodes = ref<string[]>(readStoredStringArray(roleCodesStorageKey))
   const permissions = ref<string[]>(readStoredPermissions())
   const isLoading = ref(false)
   const error = ref<FrontendApiError | null>(null)
@@ -31,6 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
   function restoreSession(): void {
     accessToken.value = getAccessToken()
     user.value = readStoredUser()
+    roleCodes.value = readStoredStringArray(roleCodesStorageKey)
     permissions.value = readStoredPermissions()
 
     if (!accessToken.value || !user.value) {
@@ -92,19 +95,23 @@ export const useAuthStore = defineStore('auth', () => {
   function persistAuthResponse(authResponse: AuthResponse): void {
     accessToken.value = authResponse.accessToken
     user.value = authResponse.user
-    permissions.value = extractPermissions(authResponse)
+    roleCodes.value = authResponse.roleCodes
+    permissions.value = authResponse.permissions
     setAccessToken(authResponse.accessToken)
     writeStoredUser(authResponse.user)
+    writeStoredStringArray(roleCodesStorageKey, roleCodes.value)
     writeStoredPermissions(permissions.value)
   }
 
   function clearSession(): void {
     accessToken.value = null
     user.value = null
+    roleCodes.value = []
     permissions.value = []
     error.value = null
     clearAccessToken()
     removeStoredUser()
+    removeStoredStringArray(roleCodesStorageKey)
     removeStoredPermissions()
   }
 
@@ -115,6 +122,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     accessToken,
     user,
+    roleCodes,
     permissions,
     isLoading,
     error,
@@ -151,42 +159,39 @@ function removeStoredUser(): void {
 }
 
 function readStoredPermissions(): string[] {
-  const rawPermissions = getStorage()?.getItem(permissionsStorageKey)
+  return readStoredStringArray(permissionsStorageKey)
+}
 
-  if (!rawPermissions) {
+function writeStoredPermissions(permissions: string[]): void {
+  writeStoredStringArray(permissionsStorageKey, permissions)
+}
+
+function removeStoredPermissions(): void {
+  removeStoredStringArray(permissionsStorageKey)
+}
+
+function readStoredStringArray(storageKey: string): string[] {
+  const rawValue = getStorage()?.getItem(storageKey)
+
+  if (!rawValue) {
     return []
   }
 
   try {
-    const parsedPermissions = JSON.parse(rawPermissions) as unknown
-    return Array.isArray(parsedPermissions) ? parsedPermissions.filter(isString) : []
+    const parsedValue = JSON.parse(rawValue) as unknown
+    return Array.isArray(parsedValue) ? parsedValue.filter(isString) : []
   } catch {
-    removeStoredPermissions()
+    removeStoredStringArray(storageKey)
     return []
   }
 }
 
-function writeStoredPermissions(permissions: string[]): void {
-  getStorage()?.setItem(permissionsStorageKey, JSON.stringify(permissions))
+function writeStoredStringArray(storageKey: string, values: string[]): void {
+  getStorage()?.setItem(storageKey, JSON.stringify(values))
 }
 
-function removeStoredPermissions(): void {
-  getStorage()?.removeItem(permissionsStorageKey)
-}
-
-function extractPermissions(authResponse: AuthResponse): string[] {
-  const responsePermissions = (authResponse as unknown as { permissions?: unknown }).permissions
-  const userPermissions = (authResponse.user as unknown as { permissions?: unknown }).permissions
-
-  if (Array.isArray(responsePermissions)) {
-    return responsePermissions.filter(isString)
-  }
-
-  if (Array.isArray(userPermissions)) {
-    return userPermissions.filter(isString)
-  }
-
-  return []
+function removeStoredStringArray(storageKey: string): void {
+  getStorage()?.removeItem(storageKey)
 }
 
 function isString(value: unknown): value is string {

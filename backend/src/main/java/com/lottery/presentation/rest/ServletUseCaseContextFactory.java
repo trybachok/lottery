@@ -20,7 +20,7 @@ public final class ServletUseCaseContextFactory {
         TokenVerifierPort.AuthenticatedPrincipal principal = tokenVerifierPort.verify(token);
         return new UseCaseContext(
                 principal.userId(),
-                principal.permissions(),
+                rbacRepository.findPermissionCodesByUserId(principal.userId()),
                 requestId(request),
                 rbacRepository.findRoleCodesByUserId(principal.userId()),
                 request.getRemoteAddr(),

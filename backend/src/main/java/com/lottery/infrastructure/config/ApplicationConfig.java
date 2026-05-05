@@ -134,6 +134,7 @@ public final class ApplicationConfig {
                 new UserMapper());
         LoginByPasswordUseCase loginByPasswordUseCase = new LoginByPasswordUseCase(
                 userRepository,
+                rbacRepository,
                 passwordHasher,
                 tokenService,
                 transactionManager,

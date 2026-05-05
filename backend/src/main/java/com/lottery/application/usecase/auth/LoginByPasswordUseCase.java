@@ -8,11 +8,14 @@ import com.lottery.application.port.auth.PasswordHasher;
 import com.lottery.application.port.auth.TokenIssuerPort;
 import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.domain.model.User;
+import com.lottery.domain.repository.RbacRepository;
 import com.lottery.domain.repository.UserRepository;
 import com.lottery.domain.valueobject.UserStatus;
+import java.util.Set;
 
 public final class LoginByPasswordUseCase {
     private final UserRepository userRepository;
+    private final RbacRepository rbacRepository;
     private final PasswordHasher passwordHasher;
     private final TokenIssuerPort tokenIssuerPort;
     private final TransactionManager transactionManager;
@@ -20,11 +23,13 @@ public final class LoginByPasswordUseCase {
 
     public LoginByPasswordUseCase(
             UserRepository userRepository,
+            RbacRepository rbacRepository,
             PasswordHasher passwordHasher,
             TokenIssuerPort tokenIssuerPort,
             TransactionManager transactionManager,
             UserMapper mapper) {
         this.userRepository = userRepository;
+        this.rbacRepository = rbacRepository;
         this.passwordHasher = passwordHasher;
         this.tokenIssuerPort = tokenIssuerPort;
         this.transactionManager = transactionManager;
@@ -44,7 +49,15 @@ public final class LoginByPasswordUseCase {
                 throw new UnauthorizedException("Invalid login or password");
             }
             TokenIssuerPort.IssuedToken token = tokenIssuerPort.issue(user.id());
-            return new AuthResponseDto(token.value(), "Bearer", token.expiresAt(), mapper.toDto(user));
+            Set<String> roleCodes = rbacRepository.findRoleCodesByUserId(user.id());
+            Set<String> permissions = rbacRepository.findPermissionCodesByUserId(user.id());
+            return new AuthResponseDto(
+                    token.value(),
+                    "Bearer",
+                    token.expiresAt(),
+                    mapper.toDto(user),
+                    roleCodes,
+                    permissions);
         });
     }
 }

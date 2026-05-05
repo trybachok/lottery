@@ -49,19 +49,25 @@ final class AuthUseCaseTest {
     @Test
     void loginIssuesOpaqueBearerToken() {
         InMemoryUserRepository users = new InMemoryUserRepository();
+        InMemoryRbacRepository rbac = new InMemoryRbacRepository();
         User user = User.create("client@example.com", "client", "hash:secret", Instant.parse("2026-05-01T00:00:00Z"));
         users.save(user);
         LoginByPasswordUseCase useCase = new LoginByPasswordUseCase(
                 users,
+                rbac,
                 passwordHasher(),
                 userId -> new TokenIssuerPort.IssuedToken("token-" + userId, Instant.parse("2026-05-01T00:15:00Z")),
                 directTransaction(),
                 new UserMapper());
+        rbac.roles.put(user.id(), Set.of(RoleCodes.CLIENT));
+        rbac.permissions.put(user.id(), Set.of("ticket.read", "ticket.create"));
 
         var result = useCase.execute(new LoginByPasswordCommand("client", "secret"));
 
         assertEquals("Bearer", result.tokenType());
         assertEquals("token-" + user.id(), result.accessToken());
+        assertEquals(Set.of(RoleCodes.CLIENT), result.roleCodes());
+        assertEquals(Set.of("ticket.read", "ticket.create"), result.permissions());
     }
 
     @Test
@@ -70,6 +76,7 @@ final class AuthUseCaseTest {
         users.save(User.create("client@example.com", "client", "hash:secret", Instant.parse("2026-05-01T00:00:00Z")));
         LoginByPasswordUseCase useCase = new LoginByPasswordUseCase(
                 users,
+                new InMemoryRbacRepository(),
                 passwordHasher(),
                 userId -> new TokenIssuerPort.IssuedToken("token", Instant.parse("2026-05-01T00:15:00Z")),
                 directTransaction(),
@@ -152,10 +159,11 @@ final class AuthUseCaseTest {
 
     private static final class InMemoryRbacRepository implements RbacRepository {
         private final Map<UUID, Set<String>> roles = new HashMap<>();
+        private final Map<UUID, Set<String>> permissions = new HashMap<>();
 
         @Override
         public Set<String> findPermissionCodesByUserId(UUID userId) {
-            return Set.of();
+            return permissions.getOrDefault(userId, Set.of());
         }
 
         @Override

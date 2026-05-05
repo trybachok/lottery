@@ -31,7 +31,10 @@ export function registerRouterGuards(router: Router): void {
       }
     }
 
-    if (!hasPermission(authStore.permissions, permissions, permissionMode)) {
+    if (
+      !authStore.roleCodes.includes('ADMIN') &&
+      !hasPermission(authStore.permissions, permissions, permissionMode)
+    ) {
       return {
         path: forbiddenPath,
         query: {

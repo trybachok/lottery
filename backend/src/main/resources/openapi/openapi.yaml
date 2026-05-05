@@ -1104,7 +1104,7 @@ components:
           writeOnly: true
     AuthResponse:
       type: object
-      required: [accessToken, tokenType, expiresAt, user]
+      required: [accessToken, tokenType, expiresAt, user, roleCodes, permissions]
       properties:
         accessToken:
           type: string
@@ -1116,6 +1116,16 @@ components:
           format: date-time
         user:
           $ref: '#/components/schemas/User'
+        roleCodes:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
+        permissions:
+          type: array
+          items:
+            type: string
+          uniqueItems: true
     User:
       type: object
       required: [id, email, login, status, createdAt, version]

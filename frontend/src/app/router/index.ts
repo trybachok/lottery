@@ -34,7 +34,7 @@ const routes: RouteRecordRaw[] = [
     },
     {
         path: '/admin',
-        component: () => import('@/pages/admin/AdminPage.vue'),
+        component: () => import('@/pages/admin/ui/AdminShell.vue'),
         meta: {
             requiresAuth: true,
             permissions: [
@@ -49,6 +49,70 @@ const routes: RouteRecordRaw[] = [
             ],
             permissionMode: 'any',
         },
+        children: [
+            {
+                path: '',
+                component: () => import('@/pages/admin/sections/AdminDashboardPage.vue'),
+            },
+            {
+                path: 'users',
+                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
+                props: {
+                    title: 'Users',
+                    description: 'User management tools will be implemented in the admin users phase.',
+                },
+                meta: {
+                    permissions: ['user.manage'],
+                },
+            },
+            {
+                path: 'roles',
+                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
+                props: {
+                    title: 'Roles and permissions',
+                    description: 'Role and permission management tools will be implemented in the RBAC phase.',
+                },
+                meta: {
+                    permissions: ['role.manage', 'permission.manage'],
+                    permissionMode: 'any',
+                },
+            },
+            {
+                path: 'draws',
+                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
+                props: {
+                    title: 'Draw management',
+                    description: 'Draw creation, manager assignment and run controls will be implemented next.',
+                },
+                meta: {
+                    permissions: ['draw.create', 'draw.run'],
+                    permissionMode: 'any',
+                },
+            },
+            {
+                path: 'reports',
+                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
+                props: {
+                    title: 'Reports',
+                    description: 'Draw and ticket reports will be implemented in the reports phase.',
+                },
+                meta: {
+                    permissions: ['report.draw.export', 'report.ticket.export'],
+                    permissionMode: 'any',
+                },
+            },
+            {
+                path: 'audit-logs',
+                component: () => import('@/pages/admin/sections/AdminSectionPlaceholder.vue'),
+                props: {
+                    title: 'Audit logs',
+                    description: 'Administrative audit log browsing will be implemented in the audit phase.',
+                },
+                meta: {
+                    permissions: ['audit.read'],
+                },
+            },
+        ],
     },
     {
         path: '/forbidden',

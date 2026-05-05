@@ -27,6 +27,8 @@ out/
 backend/target/
 frontend/dist/
 frontend/node_modules/
+frontend/storybook-static/
+.pnpm-store/
 
 # File-based project format
 *.iws

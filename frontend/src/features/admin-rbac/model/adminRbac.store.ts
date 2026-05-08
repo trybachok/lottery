@@ -55,6 +55,24 @@ export const useAdminRbacStore = defineStore('admin-rbac', () => {
     }
   }
 
+  async function loadUsers(): Promise<void> {
+    await loadResource(async () => {
+      users.value = await listAdminUsers()
+    })
+  }
+
+  async function loadRoles(): Promise<void> {
+    await loadResource(async () => {
+      roles.value = await listAdminRoles()
+    })
+  }
+
+  async function loadPermissions(): Promise<void> {
+    await loadResource(async () => {
+      permissions.value = await listAdminPermissions()
+    })
+  }
+
   async function createUser(request: AdminUserRequestWritable): Promise<User | null> {
     return saveAction(async () => {
       const user = await createAdminUser(request)
@@ -139,6 +157,19 @@ export const useAdminRbacStore = defineStore('admin-rbac', () => {
     }
   }
 
+  async function loadResource(action: () => Promise<void>): Promise<void> {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      await action()
+    } catch (caughtError) {
+      error.value = mapApiError(caughtError)
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   return {
     users,
     roles,
@@ -152,6 +183,9 @@ export const useAdminRbacStore = defineStore('admin-rbac', () => {
     error,
     actionError,
     loadAll,
+    loadUsers,
+    loadRoles,
+    loadPermissions,
     createUser,
     createRole,
     createPermission,

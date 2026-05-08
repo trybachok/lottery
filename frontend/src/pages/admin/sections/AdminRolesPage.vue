@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import AppErrorMessage from '@/shared/ui/AppErrorMessage.vue'
 import AppLoader from '@/shared/ui/AppLoader.vue'
 import BaseCard from '@/shared/ui/BaseCard.vue'
@@ -7,12 +7,19 @@ import AdminRoleCreateForm from '@/features/admin-rbac/ui/AdminRoleCreateForm.vu
 import AdminRolesTable from '@/features/admin-rbac/ui/AdminRolesTable.vue'
 import PermissionAssignmentPanel from '@/features/admin-rbac/ui/PermissionAssignmentPanel.vue'
 import { useAdminRbacStore } from '@/features/admin-rbac/model/adminRbac.store'
+import { useAuthStore } from '@/features/auth/model/auth.store'
 import type { RoleRequest } from '@/shared/api/generated/types.gen'
+import { hasPermission } from '@/shared/lib/permissions/hasPermission'
+import { PermissionCodes } from '@/shared/lib/permissions/permissionCodes'
 
 const rbacStore = useAdminRbacStore()
+const authStore = useAuthStore()
+const canManageRoles = computed(
+  () => authStore.roleCodes.includes('ADMIN') || hasPermission(authStore.permissions, [PermissionCodes.ROLE_MANAGE]),
+)
 
 onMounted(() => {
-  void rbacStore.loadAll()
+  void rbacStore.loadRoles()
 })
 
 async function createRole(request: RoleRequest): Promise<void> {
@@ -22,7 +29,7 @@ async function createRole(request: RoleRequest): Promise<void> {
 
 <template>
   <main class="admin-roles-page">
-    <BaseCard title="Create role" description="Create a role and then assign permissions to it.">
+    <BaseCard v-if="canManageRoles" title="Create role" description="Create a role and then assign permissions to it.">
       <AdminRoleCreateForm
         :loading="rbacStore.isSaving"
         :error-message="rbacStore.actionError?.message"
@@ -41,6 +48,7 @@ async function createRole(request: RoleRequest): Promise<void> {
         @select-role="rbacStore.selectRole"
       />
       <PermissionAssignmentPanel
+        v-if="canManageRoles"
         :selected-role-id="rbacStore.selectedRoleId"
         :role-permissions="rbacStore.selectedRolePermissions"
         :loading="rbacStore.isSaving"

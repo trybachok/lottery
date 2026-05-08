@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { registerRouterGuards } from './guards'
+import { PermissionCodes, UserAdminPermissions } from '@/shared/lib/permissions/permissionCodes'
 
 const routes: RouteRecordRaw[] = [
     {
@@ -24,6 +25,10 @@ const routes: RouteRecordRaw[] = [
     {
         path: '/draws',
         component: () => import('@/pages/public/DrawsPage.vue'),
+        meta: {
+            requiresAuth: true,
+            permissions: [PermissionCodes.DRAW_READ],
+        },
     },
     {
         path: '/account',
@@ -38,14 +43,17 @@ const routes: RouteRecordRaw[] = [
         meta: {
             requiresAuth: true,
             permissions: [
-                'user.manage',
-                'role.manage',
-                'permission.manage',
-                'draw.create',
-                'draw.run',
-                'report.draw.export',
-                'report.ticket.export',
-                'audit.read',
+                ...UserAdminPermissions,
+                PermissionCodes.ROLE_READ,
+                PermissionCodes.ROLE_MANAGE,
+                PermissionCodes.PERMISSION_MANAGE,
+                PermissionCodes.DRAW_READ,
+                PermissionCodes.DRAW_CREATE,
+                PermissionCodes.DRAW_UPDATE,
+                PermissionCodes.DRAW_RUN,
+                PermissionCodes.REPORT_DRAW_EXPORT,
+                PermissionCodes.REPORT_TICKET_EXPORT,
+                PermissionCodes.AUDIT_READ,
             ],
             permissionMode: 'any',
         },
@@ -58,37 +66,35 @@ const routes: RouteRecordRaw[] = [
                 path: 'users',
                 component: () => import('@/pages/admin/sections/AdminUsersPage.vue'),
                 meta: {
-                    permissions: ['user.manage'],
+                    permissions: [PermissionCodes.USER_READ],
                 },
             },
             {
                 path: 'roles',
                 component: () => import('@/pages/admin/sections/AdminRolesPage.vue'),
                 meta: {
-                    permissions: ['role.manage', 'permission.manage'],
-                    permissionMode: 'any',
+                    permissions: [PermissionCodes.ROLE_READ],
                 },
             },
             {
                 path: 'permissions',
                 component: () => import('@/pages/admin/sections/AdminPermissionsPage.vue'),
                 meta: {
-                    permissions: ['permission.manage'],
+                    permissions: [PermissionCodes.PERMISSION_MANAGE],
                 },
             },
             {
                 path: 'draws',
                 component: () => import('@/pages/admin/sections/AdminDrawsPage.vue'),
                 meta: {
-                    permissions: ['draw.create', 'draw.update', 'draw.run'],
-                    permissionMode: 'any',
+                    permissions: [PermissionCodes.DRAW_READ],
                 },
             },
             {
                 path: 'reports',
                 component: () => import('@/pages/admin/sections/AdminReportsPage.vue'),
                 meta: {
-                    permissions: ['report.draw.export', 'report.ticket.export'],
+                    permissions: [PermissionCodes.REPORT_DRAW_EXPORT, PermissionCodes.REPORT_TICKET_EXPORT],
                     permissionMode: 'any',
                 },
             },
@@ -96,7 +102,7 @@ const routes: RouteRecordRaw[] = [
                 path: 'audit-logs',
                 component: () => import('@/pages/admin/sections/AdminAuditLogsPage.vue'),
                 meta: {
-                    permissions: ['audit.read'],
+                    permissions: [PermissionCodes.AUDIT_READ],
                 },
             },
         ],

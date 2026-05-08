@@ -31,7 +31,7 @@ const roles: Role[] = [
 ]
 
 const permissions: Permission[] = [
-  { id: 'permission-1', code: 'user.manage', description: 'Manage users' },
+  { id: 'permission-1', code: 'user.read', description: 'Read users' },
   { id: 'permission-2', code: 'draw.run', description: 'Run draws' },
 ]
 

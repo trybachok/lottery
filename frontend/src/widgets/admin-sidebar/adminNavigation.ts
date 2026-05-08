@@ -1,4 +1,5 @@
 import { hasPermission } from '@/shared/lib/permissions/hasPermission'
+import { PermissionCodes, UserAdminPermissions } from '@/shared/lib/permissions/permissionCodes'
 
 export type AdminNavigationItem = {
   label: string
@@ -11,41 +12,44 @@ export const adminNavigationItems: AdminNavigationItem[] = [
   {
     label: 'Dashboard',
     to: '/admin',
-    permissions: ['user.manage', 'draw.create', 'report.draw.export', 'audit.read'],
+    permissions: [
+      ...UserAdminPermissions,
+      PermissionCodes.DRAW_READ,
+      PermissionCodes.REPORT_DRAW_EXPORT,
+      PermissionCodes.AUDIT_READ,
+    ],
     permissionMode: 'any',
   },
   {
     label: 'Users',
     to: '/admin/users',
-    permissions: ['user.manage'],
+    permissions: [PermissionCodes.USER_READ],
   },
   {
     label: 'Roles',
     to: '/admin/roles',
-    permissions: ['role.manage', 'permission.manage'],
-    permissionMode: 'any',
+    permissions: [PermissionCodes.ROLE_READ],
   },
   {
     label: 'Permissions',
     to: '/admin/permissions',
-    permissions: ['permission.manage'],
+    permissions: [PermissionCodes.PERMISSION_MANAGE],
   },
   {
     label: 'Draws',
     to: '/admin/draws',
-    permissions: ['draw.create', 'draw.update', 'draw.run'],
-    permissionMode: 'any',
+    permissions: [PermissionCodes.DRAW_READ],
   },
   {
     label: 'Reports',
     to: '/admin/reports',
-    permissions: ['report.draw.export', 'report.ticket.export'],
+    permissions: [PermissionCodes.REPORT_DRAW_EXPORT, PermissionCodes.REPORT_TICKET_EXPORT],
     permissionMode: 'any',
   },
   {
     label: 'Audit',
     to: '/admin/audit-logs',
-    permissions: ['audit.read'],
+    permissions: [PermissionCodes.AUDIT_READ],
   },
 ]
 

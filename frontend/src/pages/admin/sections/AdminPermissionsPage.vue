@@ -11,7 +11,7 @@ import type { PermissionRequest } from '@/shared/api/generated/types.gen'
 const rbacStore = useAdminRbacStore()
 
 onMounted(() => {
-  void rbacStore.loadAll()
+  void rbacStore.loadPermissions()
 })
 
 async function createPermission(request: PermissionRequest): Promise<void> {

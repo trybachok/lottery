@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import AppErrorMessage from '@/shared/ui/AppErrorMessage.vue'
 import AppLoader from '@/shared/ui/AppLoader.vue'
 import BaseCard from '@/shared/ui/BaseCard.vue'
@@ -7,12 +7,19 @@ import AdminUserCreateForm from '@/features/admin-rbac/ui/AdminUserCreateForm.vu
 import AdminUsersTable from '@/features/admin-rbac/ui/AdminUsersTable.vue'
 import RoleAssignmentPanel from '@/features/admin-rbac/ui/RoleAssignmentPanel.vue'
 import { useAdminRbacStore } from '@/features/admin-rbac/model/adminRbac.store'
+import { useAuthStore } from '@/features/auth/model/auth.store'
 import type { AdminUserRequestWritable } from '@/shared/api/generated/types.gen'
+import { hasPermission } from '@/shared/lib/permissions/hasPermission'
+import { PermissionCodes } from '@/shared/lib/permissions/permissionCodes'
 
 const rbacStore = useAdminRbacStore()
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.roleCodes.includes('ADMIN'))
+const canCreateUser = computed(() => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.USER_CREATE]))
+const canUpdateUser = computed(() => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.USER_UPDATE]))
 
 onMounted(() => {
-  void rbacStore.loadAll()
+  void rbacStore.loadUsers()
 })
 
 async function createUser(request: AdminUserRequestWritable): Promise<void> {
@@ -22,7 +29,7 @@ async function createUser(request: AdminUserRequestWritable): Promise<void> {
 
 <template>
   <main class="admin-users-page">
-    <BaseCard title="Create user" description="Create an administrative or client user.">
+    <BaseCard v-if="canCreateUser" title="Create user" description="Create an administrative or client user.">
       <AdminUserCreateForm
         :loading="rbacStore.isSaving"
         :error-message="rbacStore.actionError?.message"
@@ -41,6 +48,7 @@ async function createUser(request: AdminUserRequestWritable): Promise<void> {
         @select-user="rbacStore.selectUser"
       />
       <RoleAssignmentPanel
+        v-if="canUpdateUser"
         :selected-user-id="rbacStore.selectedUserId"
         :user-roles="rbacStore.selectedUserRoles"
         :loading="rbacStore.isSaving"

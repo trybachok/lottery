@@ -33,4 +33,8 @@ public record Payment(
     public Payment withStatus(PaymentStatus newStatus, Instant now) {
         return new Payment(id, invoiceId, providerCode, newStatus, amount, externalPaymentId, createdAt, now);
     }
+
+    public Payment withExternalPaymentId(String newExternalPaymentId, Instant now) {
+        return new Payment(id, invoiceId, providerCode, status, amount, newExternalPaymentId, createdAt, now);
+    }
 }

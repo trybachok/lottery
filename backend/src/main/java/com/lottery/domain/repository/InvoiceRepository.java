@@ -16,6 +16,8 @@ public interface InvoiceRepository {
 
     Optional<Invoice> findByExternalInvoiceId(String providerCode, String externalInvoiceId);
 
+    Optional<Invoice> findActiveByTicketId(UUID ticketId);
+
     default List<Invoice> findByTicketId(UUID ticketId) {
         return List.of();
     }

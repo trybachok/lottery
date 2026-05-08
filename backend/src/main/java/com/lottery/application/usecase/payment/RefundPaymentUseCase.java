@@ -8,25 +8,31 @@ import com.lottery.application.command.RefundPaymentCommand;
 import com.lottery.application.dto.PaymentDto;
 import com.lottery.application.mapper.PaymentMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
-import com.lottery.application.port.payment.PaymentProviderPort;
 import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.domain.model.Invoice;
 import com.lottery.domain.model.Payment;
+import com.lottery.domain.model.PaymentOutboxMessage;
 import com.lottery.domain.model.Ticket;
 import com.lottery.domain.repository.InvoiceRepository;
+import com.lottery.domain.repository.PaymentOutboxRepository;
 import com.lottery.domain.repository.PaymentRepository;
 import com.lottery.domain.repository.TicketRepository;
 import com.lottery.domain.service.DomainClock;
 import com.lottery.domain.valueobject.InvoiceStatus;
+import com.lottery.domain.valueobject.PaymentOutboxType;
 import com.lottery.domain.valueobject.PaymentStatus;
 import com.lottery.domain.valueobject.PermissionCodes;
 import com.lottery.domain.valueobject.TicketStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class RefundPaymentUseCase {
+    private static final Logger log = LoggerFactory.getLogger(RefundPaymentUseCase.class);
+
     private final PaymentRepository paymentRepository;
     private final InvoiceRepository invoiceRepository;
     private final TicketRepository ticketRepository;
-    private final PaymentProviderPort paymentProviderPort;
+    private final PaymentOutboxRepository outboxRepository;
     private final AuthorizationPort authorizationPort;
     private final TransactionManager transactionManager;
     private final DomainClock clock;
@@ -37,7 +43,7 @@ public final class RefundPaymentUseCase {
             PaymentRepository paymentRepository,
             InvoiceRepository invoiceRepository,
             TicketRepository ticketRepository,
-            PaymentProviderPort paymentProviderPort,
+            PaymentOutboxRepository outboxRepository,
             AuthorizationPort authorizationPort,
             TransactionManager transactionManager,
             DomainClock clock,
@@ -46,7 +52,7 @@ public final class RefundPaymentUseCase {
                 paymentRepository,
                 invoiceRepository,
                 ticketRepository,
-                paymentProviderPort,
+                outboxRepository,
                 authorizationPort,
                 transactionManager,
                 clock,
@@ -58,7 +64,7 @@ public final class RefundPaymentUseCase {
             PaymentRepository paymentRepository,
             InvoiceRepository invoiceRepository,
             TicketRepository ticketRepository,
-            PaymentProviderPort paymentProviderPort,
+            PaymentOutboxRepository outboxRepository,
             AuthorizationPort authorizationPort,
             TransactionManager transactionManager,
             DomainClock clock,
@@ -67,7 +73,7 @@ public final class RefundPaymentUseCase {
         this.paymentRepository = paymentRepository;
         this.invoiceRepository = invoiceRepository;
         this.ticketRepository = ticketRepository;
-        this.paymentProviderPort = paymentProviderPort;
+        this.outboxRepository = outboxRepository;
         this.authorizationPort = authorizationPort;
         this.transactionManager = transactionManager;
         this.clock = clock;
@@ -90,21 +96,22 @@ public final class RefundPaymentUseCase {
             var refundRequestedAt = clock.now();
             invoiceRepository.update(invoice.withStatus(InvoiceStatus.REFUND_PENDING, refundRequestedAt));
             ticketRepository.update(ticket.withPaymentStatus(TicketStatus.REFUND_PENDING, refundRequestedAt));
-            paymentProviderPort.refundPayment(new PaymentProviderPort.RefundRequest(
+            outboxRepository.save(PaymentOutboxMessage.pending(
+                    PaymentOutboxType.REFUND_PAYMENT,
+                    invoice.id(),
+                    payment.id(),
                     payment.providerCode(),
-                    payment.maybeExternalPaymentId().orElse(""),
-                    payment.amount().amount(),
-                    payment.amount().currency(),
-                    command.idempotencyKey()));
-            var refundedAt = clock.now();
-            invoiceRepository.update(invoice.withStatus(InvoiceStatus.REFUNDED, refundedAt));
-            Payment refundedPayment = payment.withStatus(PaymentStatus.REFUNDED, refundedAt);
-            paymentRepository.update(refundedPayment);
-            ticketRepository.update(ticket.withPaymentStatus(TicketStatus.REFUNDED, refundedAt));
+                    "{\"idempotencyKey\":\"" + escape(command.idempotencyKey()) + "\"}",
+                    refundRequestedAt));
             if (auditService != null) {
-                auditService.record(context, "PAYMENT_REFUND", "PAYMENT", refundedPayment.id());
+                auditService.record(context, "PAYMENT_REFUND_REQUESTED", "PAYMENT", payment.id());
             }
-            return mapper.toDto(refundedPayment);
+            log.info("requestId={} paymentId={} invoiceId={} payment_refund_enqueued", context.requestId(), payment.id(), invoice.id());
+            return mapper.toDto(payment);
         });
+    }
+
+    private String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

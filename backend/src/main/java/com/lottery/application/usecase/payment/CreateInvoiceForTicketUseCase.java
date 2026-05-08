@@ -7,30 +7,34 @@ import com.lottery.application.command.CreateInvoiceForTicketCommand;
 import com.lottery.application.dto.InvoiceDto;
 import com.lottery.application.mapper.InvoiceMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
-import com.lottery.application.port.payment.PaymentProviderPort;
-import com.lottery.application.port.payment.PaymentProviderPort.InvoiceCreationRequest;
-import com.lottery.application.port.payment.PaymentProviderPort.InvoiceCreationResult;
 import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.domain.model.Invoice;
 import com.lottery.domain.model.Payment;
+import com.lottery.domain.model.PaymentOutboxMessage;
 import com.lottery.domain.model.Ticket;
 import com.lottery.domain.repository.InvoiceRepository;
+import com.lottery.domain.repository.PaymentOutboxRepository;
 import com.lottery.domain.repository.PaymentRepository;
 import com.lottery.domain.repository.TicketRepository;
 import com.lottery.domain.service.DomainClock;
 import com.lottery.domain.valueobject.DomainIds;
 import com.lottery.domain.valueobject.InvoiceStatus;
+import com.lottery.domain.valueobject.PaymentOutboxType;
 import com.lottery.domain.valueobject.PaymentStatus;
 import com.lottery.domain.valueobject.PermissionCodes;
 import com.lottery.domain.valueobject.RoleCodes;
 import com.lottery.domain.valueobject.TicketStatus;
 import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class CreateInvoiceForTicketUseCase {
+    private static final Logger log = LoggerFactory.getLogger(CreateInvoiceForTicketUseCase.class);
+
     private final TicketRepository ticketRepository;
     private final InvoiceRepository invoiceRepository;
     private final PaymentRepository paymentRepository;
-    private final PaymentProviderPort paymentProviderPort;
+    private final PaymentOutboxRepository outboxRepository;
     private final AuthorizationPort authorizationPort;
     private final TransactionManager transactionManager;
     private final DomainClock clock;
@@ -40,7 +44,7 @@ public final class CreateInvoiceForTicketUseCase {
             TicketRepository ticketRepository,
             InvoiceRepository invoiceRepository,
             PaymentRepository paymentRepository,
-            PaymentProviderPort paymentProviderPort,
+            PaymentOutboxRepository outboxRepository,
             AuthorizationPort authorizationPort,
             TransactionManager transactionManager,
             DomainClock clock,
@@ -48,7 +52,7 @@ public final class CreateInvoiceForTicketUseCase {
         this.ticketRepository = ticketRepository;
         this.invoiceRepository = invoiceRepository;
         this.paymentRepository = paymentRepository;
-        this.paymentProviderPort = paymentProviderPort;
+        this.outboxRepository = outboxRepository;
         this.authorizationPort = authorizationPort;
         this.transactionManager = transactionManager;
         this.clock = clock;
@@ -58,51 +62,64 @@ public final class CreateInvoiceForTicketUseCase {
     public InvoiceDto execute(CreateInvoiceForTicketCommand command, UseCaseContext context) {
         return transactionManager.inTransaction(() -> {
             authorizationPort.ensurePermission(context, PermissionCodes.TICKET_CREATE);
-            Invoice existing = invoiceRepository.findByIdempotencyKey(command.idempotencyKey()).orElse(null);
-            if (existing != null) {
-                return mapper.toDto(existing, null);
-            }
             Ticket ticket = ticketRepository.findById(command.ticketId()).orElseThrow(() -> new NotFoundException("Ticket"));
             boolean privileged = authorizationPort.hasRole(context, RoleCodes.ADMIN)
                     || authorizationPort.hasRole(context, RoleCodes.MANAGER);
             if (!privileged && (context.actorUserId() == null || !context.actorUserId().equals(ticket.userId()))) {
                 throw new ConflictException("TICKET_OWNERSHIP_REQUIRED", "Client can create invoice only for own ticket");
             }
+            Invoice existingByIdempotency = invoiceRepository.findByIdempotencyKey(command.idempotencyKey()).orElse(null);
+            if (existingByIdempotency != null) {
+                if (!existingByIdempotency.ticketId().equals(ticket.id())) {
+                    throw new ConflictException("INVOICE_IDEMPOTENCY_KEY_REUSED", "Idempotency key is already used for another ticket");
+                }
+                return mapper.toDto(existingByIdempotency, null);
+            }
+            Invoice activeInvoice = invoiceRepository.findActiveByTicketId(ticket.id()).orElse(null);
+            if (activeInvoice != null) {
+                throw new ConflictException("ACTIVE_INVOICE_EXISTS", "Ticket already has an active invoice");
+            }
             if (ticket.status() != TicketStatus.CREATED && ticket.status() != TicketStatus.PAYMENT_FAILED) {
                 throw new ConflictException("TICKET_NOT_PAYABLE", "Ticket is not available for invoice creation");
             }
-            InvoiceCreationResult providerResult = paymentProviderPort.createInvoice(new InvoiceCreationRequest(
-                    command.providerCode(),
-                    ticket.id(),
-                    ticket.userId(),
-                    ticket.price().amount(),
-                    ticket.price().currency(),
-                    command.idempotencyKey()));
             Instant now = clock.now();
             Invoice invoice = new Invoice(
                     DomainIds.newId(),
                     ticket.id(),
                     ticket.userId(),
-                    providerResult.providerCode(),
-                    InvoiceStatus.PENDING,
+                    command.providerCode(),
+                    InvoiceStatus.CREATED,
                     ticket.price(),
-                    providerResult.externalInvoiceId(),
+                    null,
+                    null,
                     command.idempotencyKey(),
                     now,
                     now.plusSeconds(900),
                     null);
             Invoice saved = invoiceRepository.save(invoice);
-            paymentRepository.save(new Payment(
+            Payment payment = paymentRepository.save(new Payment(
                     DomainIds.newId(),
                     saved.id(),
-                    providerResult.providerCode(),
+                    command.providerCode(),
                     PaymentStatus.INITIATED,
                     saved.amount(),
-                    providerResult.externalPaymentId(),
+                    null,
                     now,
                     now));
+            outboxRepository.save(PaymentOutboxMessage.pending(
+                    PaymentOutboxType.CREATE_INVOICE,
+                    saved.id(),
+                    payment.id(),
+                    command.providerCode(),
+                    "{\"idempotencyKey\":\"" + escape(command.idempotencyKey()) + "\"}",
+                    now));
             ticketRepository.update(ticket.withPaymentStatus(TicketStatus.PAYMENT_PENDING, now));
-            return mapper.toDto(saved, providerResult.paymentUrl());
+            log.info("requestId={} invoiceId={} ticketId={} payment_create_invoice_enqueued", context.requestId(), saved.id(), ticket.id());
+            return mapper.toDto(saved, null);
         });
+    }
+
+    private String escape(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

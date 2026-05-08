@@ -14,7 +14,7 @@ public final class InvoiceMapper {
                 invoice.amount().amount(),
                 invoice.amount().currency().getCurrencyCode(),
                 invoice.maybeExternalInvoiceId().orElse(null),
-                paymentUrl,
+                paymentUrl == null ? invoice.maybePaymentUrl().orElse(null) : paymentUrl,
                 invoice.createdAt(),
                 invoice.maybeExpiresAt().orElse(null),
                 invoice.maybePaidAt().orElse(null));

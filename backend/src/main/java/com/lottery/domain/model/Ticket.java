@@ -197,6 +197,26 @@ public final class Ticket {
                 version);
     }
 
+    public Ticket withPaymentReleased(Instant now) {
+        return new Ticket(
+                id,
+                userId,
+                drawId,
+                TicketStatus.CREATED,
+                combination,
+                price,
+                matchPercent,
+                prizeId,
+                test,
+                createdAt,
+                paidAt,
+                participatedAt,
+                checkedAt,
+                cancelledAt,
+                deletedAt,
+                version);
+    }
+
     public Ticket withCancelled(Instant now) {
         if (status == TicketStatus.PAID
                 || status == TicketStatus.WIN

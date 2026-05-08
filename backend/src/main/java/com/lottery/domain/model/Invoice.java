@@ -15,6 +15,7 @@ public record Invoice(
         InvoiceStatus status,
         Money amount,
         String externalInvoiceId,
+        String paymentUrl,
         String idempotencyKey,
         Instant createdAt,
         Instant expiresAt,
@@ -34,6 +35,10 @@ public record Invoice(
         return Optional.ofNullable(externalInvoiceId);
     }
 
+    public Optional<String> maybePaymentUrl() {
+        return Optional.ofNullable(paymentUrl);
+    }
+
     public Optional<Instant> maybeExpiresAt() {
         return Optional.ofNullable(expiresAt);
     }
@@ -51,9 +56,41 @@ public record Invoice(
                 newStatus,
                 amount,
                 externalInvoiceId,
+                paymentUrl,
                 idempotencyKey,
                 createdAt,
                 expiresAt,
                 newStatus == InvoiceStatus.PAID ? now : paidAt);
+    }
+
+    public Invoice withProviderData(String newExternalInvoiceId, String newPaymentUrl, Instant now) {
+        return new Invoice(
+                id,
+                ticketId,
+                userId,
+                providerCode,
+                status,
+                amount,
+                newExternalInvoiceId,
+                newPaymentUrl,
+                idempotencyKey,
+                createdAt,
+                expiresAt,
+                paidAt);
+    }
+
+    public Invoice(
+            UUID id,
+            UUID ticketId,
+            UUID userId,
+            String providerCode,
+            InvoiceStatus status,
+            Money amount,
+            String externalInvoiceId,
+            String idempotencyKey,
+            Instant createdAt,
+            Instant expiresAt,
+            Instant paidAt) {
+        this(id, ticketId, userId, providerCode, status, amount, externalInvoiceId, null, idempotencyKey, createdAt, expiresAt, paidAt);
     }
 }

@@ -587,10 +587,100 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateInvoiceRequest'
+  /invoices/{invoiceId}:
+    get:
+      operationId: getInvoiceById
+      summary: Get invoice by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /invoices/{invoiceId}/cancel:
+    post:
+      operationId: cancelInvoice
+      summary: Cancel active invoice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelInvoiceRequest'
+  /invoices/{invoiceId}/expire:
+    post:
+      operationId: expireInvoice
+      summary: Expire active invoice after expiration time
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /payments/{paymentId}/refund:
     post:
       operationId: refundPayment
-      summary: Refund captured payment
+      summary: Request refund for captured payment
       security:
         - bearerAuth: []
       parameters:
@@ -602,7 +692,7 @@ paths:
             format: uuid
       responses:
         '200':
-          description: Payment refunded
+          description: Refund request accepted and queued
           content:
             application/json:
               schema:
@@ -1269,9 +1359,11 @@ components:
     InvoiceStatus:
       type: string
       enum: [CREATED, PENDING, PAID, FAILED, CANCELLED, REFUND_PENDING, REFUNDED, EXPIRED]
+      description: CREATED means local invoice was created and provider creation is queued; PENDING means provider invoice exists or payment is AUTHORIZED; CANCELLED and EXPIRED release the ticket for a new invoice.
     PaymentStatus:
       type: string
       enum: [INITIATED, AUTHORIZED, CAPTURED, FAILED, CANCELLED, REFUNDED]
+      description: AUTHORIZED means provider authorized payment before capture; CANCELLED means provider/local payment was cancelled or invoice expired.
     UserStatus:
       type: string
       enum: [ACTIVE, BLOCKED, DELETED]
@@ -1826,6 +1918,13 @@ components:
           type: string
           format: date-time
     RefundPaymentRequest:
+      type: object
+      required: [idempotencyKey]
+      properties:
+        idempotencyKey:
+          type: string
+          minLength: 1
+    CancelInvoiceRequest:
       type: object
       required: [idempotencyKey]
       properties:

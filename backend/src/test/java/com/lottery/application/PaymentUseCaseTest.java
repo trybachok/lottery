@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lottery.application.command.CancelInvoiceCommand;
 import com.lottery.application.command.CreateInvoiceForTicketCommand;
 import com.lottery.application.command.ProcessPaymentWebhookCommand;
 import com.lottery.application.command.RefundPaymentCommand;
@@ -14,14 +15,20 @@ import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.payment.PaymentProviderPort;
 import com.lottery.application.port.payment.WebhookSignatureVerifierPort;
 import com.lottery.application.port.transaction.TransactionManager;
+import com.lottery.application.usecase.payment.CancelInvoiceUseCase;
 import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
+import com.lottery.application.usecase.payment.ExpireInvoiceUseCase;
+import com.lottery.application.usecase.payment.GetInvoiceUseCase;
+import com.lottery.application.usecase.payment.ProcessPaymentOutboxUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
 import com.lottery.domain.model.Invoice;
 import com.lottery.domain.model.Payment;
+import com.lottery.domain.model.PaymentOutboxMessage;
 import com.lottery.domain.model.PaymentWebhookEvent;
 import com.lottery.domain.model.Ticket;
 import com.lottery.domain.repository.InvoiceRepository;
+import com.lottery.domain.repository.PaymentOutboxRepository;
 import com.lottery.domain.repository.PaymentRepository;
 import com.lottery.domain.repository.PaymentWebhookEventRepository;
 import com.lottery.domain.repository.TicketRepository;
@@ -30,6 +37,7 @@ import com.lottery.domain.valueobject.Combination;
 import com.lottery.domain.valueobject.InvoiceStatus;
 import com.lottery.domain.valueobject.Money;
 import com.lottery.domain.valueobject.PaymentStatus;
+import com.lottery.domain.valueobject.PaymentOutboxStatus;
 import com.lottery.domain.valueobject.PermissionCodes;
 import com.lottery.domain.valueobject.TicketStatus;
 import java.math.BigDecimal;
@@ -55,12 +63,13 @@ final class PaymentUseCaseTest {
         InMemoryTicketRepository tickets = new InMemoryTicketRepository(List.of(ticket));
         InMemoryInvoiceRepository invoices = new InMemoryInvoiceRepository();
         InMemoryPaymentRepository payments = new InMemoryPaymentRepository();
+        InMemoryPaymentOutboxRepository outbox = new InMemoryPaymentOutboxRepository();
         FakePaymentProvider provider = new FakePaymentProvider();
         CreateInvoiceForTicketUseCase useCase = new CreateInvoiceForTicketUseCase(
                 tickets,
                 invoices,
                 payments,
-                provider,
+                outbox,
                 grantAll(),
                 directTransaction(),
                 fixedClock(),
@@ -70,13 +79,86 @@ final class PaymentUseCaseTest {
                 new CreateInvoiceForTicketCommand(ticket.id(), "mock", "invoice-idem-1"),
                 new UseCaseContext(userId, Set.of(PermissionCodes.TICKET_CREATE), "req_test"));
 
-        assertEquals("PENDING", result.status());
+        assertEquals("CREATED", result.status());
         assertEquals("mock", result.providerCode());
-        assertEquals("https://mock-payments.test/invoices/ext-inv-" + ticket.id(), result.paymentUrl());
-        assertEquals("mock", provider.lastInvoiceRequest.providerCode());
-        assertEquals(InvoiceStatus.PENDING, invoices.byId.get(result.id()).status());
+        assertEquals(null, result.paymentUrl());
+        assertEquals(null, provider.lastInvoiceRequest);
+        assertEquals(InvoiceStatus.CREATED, invoices.byId.get(result.id()).status());
         assertEquals(PaymentStatus.INITIATED, payments.findByInvoiceId(result.id()).orElseThrow().status());
         assertEquals(TicketStatus.PAYMENT_PENDING, tickets.byId.get(ticket.id()).status());
+        assertEquals(1, outbox.byId.size());
+    }
+
+    @Test
+    void paymentOutboxCreatesProviderInvoiceAndUpdatesExternalFields() {
+        UUID userId = UUID.randomUUID();
+        Ticket ticket = ticket(userId, TicketStatus.CREATED);
+        InMemoryTicketRepository tickets = new InMemoryTicketRepository(List.of(ticket));
+        InMemoryInvoiceRepository invoices = new InMemoryInvoiceRepository();
+        InMemoryPaymentRepository payments = new InMemoryPaymentRepository();
+        InMemoryPaymentOutboxRepository outbox = new InMemoryPaymentOutboxRepository();
+        FakePaymentProvider provider = new FakePaymentProvider();
+        CreateInvoiceForTicketUseCase createUseCase = new CreateInvoiceForTicketUseCase(
+                tickets,
+                invoices,
+                payments,
+                outbox,
+                grantAll(),
+                directTransaction(),
+                fixedClock(),
+                new InvoiceMapper());
+
+        var invoiceDto = createUseCase.execute(
+                new CreateInvoiceForTicketCommand(ticket.id(), "mock", "invoice-idem-1"),
+                new UseCaseContext(userId, Set.of(PermissionCodes.TICKET_CREATE), "req_test"));
+        ProcessPaymentOutboxUseCase outboxUseCase = new ProcessPaymentOutboxUseCase(
+                outbox,
+                invoices,
+                payments,
+                tickets,
+                provider,
+                directTransaction(),
+                fixedClock(),
+                new ObjectMapper());
+
+        var result = outboxUseCase.executeDue(10);
+
+        assertEquals(1, result.processed());
+        assertEquals(0, result.failed());
+        assertEquals("mock", provider.lastInvoiceRequest.providerCode());
+        assertEquals(InvoiceStatus.PENDING, invoices.byId.get(invoiceDto.id()).status());
+        assertEquals("ext-inv-" + ticket.id(), invoices.byId.get(invoiceDto.id()).maybeExternalInvoiceId().orElseThrow());
+        assertEquals("https://mock-payments.test/invoices/ext-inv-" + ticket.id(), invoices.byId.get(invoiceDto.id()).maybePaymentUrl().orElseThrow());
+        assertEquals("ext-pay-" + ticket.id(), payments.findByInvoiceId(invoiceDto.id()).orElseThrow().maybeExternalPaymentId().orElseThrow());
+        assertEquals(PaymentOutboxStatus.PROCESSED, outbox.byId.values().iterator().next().status());
+    }
+
+    @Test
+    void createInvoiceRejectsAnotherActiveInvoiceForTicketWithDifferentIdempotencyKey() {
+        UUID userId = UUID.randomUUID();
+        Ticket ticket = ticket(userId, TicketStatus.PAYMENT_PENDING);
+        Invoice invoice = invoice(ticket, InvoiceStatus.PENDING);
+        InMemoryTicketRepository tickets = new InMemoryTicketRepository(List.of(ticket));
+        InMemoryInvoiceRepository invoices = new InMemoryInvoiceRepository(List.of(invoice));
+        InMemoryPaymentRepository payments = new InMemoryPaymentRepository();
+        InMemoryPaymentOutboxRepository outbox = new InMemoryPaymentOutboxRepository();
+        CreateInvoiceForTicketUseCase useCase = new CreateInvoiceForTicketUseCase(
+                tickets,
+                invoices,
+                payments,
+                outbox,
+                grantAll(),
+                directTransaction(),
+                fixedClock(),
+                new InvoiceMapper());
+
+        ConflictException exception = org.junit.jupiter.api.Assertions.assertThrows(
+                ConflictException.class,
+                () -> useCase.execute(
+                        new CreateInvoiceForTicketCommand(ticket.id(), "mock", "another-idem"),
+                        new UseCaseContext(userId, Set.of(PermissionCodes.TICKET_CREATE), "req_test")));
+
+        assertEquals("ACTIVE_INVOICE_EXISTS", exception.code());
     }
 
     @Test
@@ -142,14 +224,84 @@ final class PaymentUseCaseTest {
     }
 
     @Test
-    void refundCapturedPaymentMovesInvoicePaymentAndTicketToRefunded() {
+    void getInvoiceEnforcesOwnership() {
+        PaymentFixture fixture = new PaymentFixture(TicketStatus.PAYMENT_PENDING, InvoiceStatus.PENDING, PaymentStatus.INITIATED);
+        GetInvoiceUseCase useCase = new GetInvoiceUseCase(
+                fixture.invoices,
+                grantAll(),
+                directTransaction(),
+                new InvoiceMapper());
+
+        var result = useCase.execute(
+                fixture.invoice.id(),
+                new UseCaseContext(fixture.ticket.userId(), Set.of(PermissionCodes.PAYMENT_READ), "req_test"));
+
+        assertEquals(fixture.invoice.id(), result.id());
+        org.junit.jupiter.api.Assertions.assertThrows(
+                ConflictException.class,
+                () -> useCase.execute(
+                        fixture.invoice.id(),
+                        new UseCaseContext(UUID.randomUUID(), Set.of(PermissionCodes.PAYMENT_READ), "req_test")));
+    }
+
+    @Test
+    void cancelInvoiceClosesActiveInvoiceReleasesTicketAndEnqueuesProviderCancel() {
+        PaymentFixture fixture = new PaymentFixture(TicketStatus.PAYMENT_PENDING, InvoiceStatus.PENDING, PaymentStatus.INITIATED);
+        InMemoryPaymentOutboxRepository outbox = new InMemoryPaymentOutboxRepository();
+        CancelInvoiceUseCase useCase = new CancelInvoiceUseCase(
+                fixture.invoices,
+                fixture.payments,
+                fixture.tickets,
+                outbox,
+                grantAll(),
+                directTransaction(),
+                fixedClock(),
+                new InvoiceMapper());
+
+        var result = useCase.execute(
+                new CancelInvoiceCommand(fixture.invoice.id(), "cancel-idem-1"),
+                new UseCaseContext(fixture.ticket.userId(), Set.of(PermissionCodes.PAYMENT_READ), "req_test"));
+
+        assertEquals("CANCELLED", result.status());
+        assertEquals(InvoiceStatus.CANCELLED, fixture.invoices.byId.get(fixture.invoice.id()).status());
+        assertEquals(PaymentStatus.CANCELLED, fixture.payments.byId.get(fixture.payment.id()).status());
+        assertEquals(TicketStatus.CREATED, fixture.tickets.byId.get(fixture.ticket.id()).status());
+        assertEquals(1, outbox.byId.size());
+    }
+
+    @Test
+    void expireInvoiceRequiresExpiredDeadline() {
+        PaymentFixture fixture = new PaymentFixture(TicketStatus.PAYMENT_PENDING, InvoiceStatus.PENDING, PaymentStatus.INITIATED);
+        InMemoryPaymentOutboxRepository outbox = new InMemoryPaymentOutboxRepository();
+        ExpireInvoiceUseCase useCase = new ExpireInvoiceUseCase(new CancelInvoiceUseCase(
+                fixture.invoices,
+                fixture.payments,
+                fixture.tickets,
+                outbox,
+                grantAll(),
+                directTransaction(),
+                fixedClock(),
+                new InvoiceMapper()));
+
+        ConflictException exception = org.junit.jupiter.api.Assertions.assertThrows(
+                ConflictException.class,
+                () -> useCase.execute(
+                        fixture.invoice.id(),
+                        new UseCaseContext(fixture.ticket.userId(), Set.of(PermissionCodes.PAYMENT_READ), "req_test")));
+
+        assertEquals("INVOICE_NOT_EXPIRED", exception.code());
+    }
+
+    @Test
+    void refundCapturedPaymentEnqueuesOutboxAndProcessorMovesInvoicePaymentAndTicketToRefunded() {
         PaymentFixture fixture = new PaymentFixture(TicketStatus.PAID, InvoiceStatus.PAID, PaymentStatus.CAPTURED);
         FakePaymentProvider provider = new FakePaymentProvider();
+        InMemoryPaymentOutboxRepository outbox = new InMemoryPaymentOutboxRepository();
         RefundPaymentUseCase useCase = new RefundPaymentUseCase(
                 fixture.payments,
                 fixture.invoices,
                 fixture.tickets,
-                provider,
+                outbox,
                 grantAll(),
                 directTransaction(),
                 fixedClock(),
@@ -159,9 +311,24 @@ final class PaymentUseCaseTest {
                 new RefundPaymentCommand(fixture.payment.id(), "refund-idem-1"),
                 new UseCaseContext(UUID.randomUUID(), Set.of(PermissionCodes.PAYMENT_REFUND), "req_test"));
 
-        assertEquals("REFUNDED", result.status());
+        assertEquals("CAPTURED", result.status());
+        assertEquals(0, provider.refundCalls);
+        assertEquals(InvoiceStatus.REFUND_PENDING, fixture.invoices.byId.get(fixture.invoice.id()).status());
+        assertEquals(TicketStatus.REFUND_PENDING, fixture.tickets.byId.get(fixture.ticket.id()).status());
+        assertEquals(1, outbox.byId.size());
+
+        ProcessPaymentOutboxUseCase outboxUseCase = new ProcessPaymentOutboxUseCase(
+                outbox,
+                fixture.invoices,
+                fixture.payments,
+                fixture.tickets,
+                provider,
+                directTransaction(),
+                fixedClock(),
+                new ObjectMapper());
+        outboxUseCase.executeDue(10);
+
         assertEquals(1, provider.refundCalls);
-        assertEquals("refund-idem-1", provider.lastRefundRequest.idempotencyKey());
         assertEquals(InvoiceStatus.REFUNDED, fixture.invoices.byId.get(fixture.invoice.id()).status());
         assertEquals(PaymentStatus.REFUNDED, fixture.payments.byId.get(fixture.payment.id()).status());
         assertEquals(TicketStatus.REFUNDED, fixture.tickets.byId.get(fixture.ticket.id()).status());
@@ -190,6 +357,22 @@ final class PaymentUseCaseTest {
                 null,
                 null,
                 0);
+    }
+
+    private static Invoice invoice(Ticket ticket, InvoiceStatus status) {
+        return new Invoice(
+                UUID.randomUUID(),
+                ticket.id(),
+                ticket.userId(),
+                "mock",
+                status,
+                ticket.price(),
+                "ext-inv-" + ticket.id(),
+                "https://mock-payments.test/invoices/ext-inv-" + ticket.id(),
+                "invoice-idem-fixture",
+                NOW.minusSeconds(30),
+                NOW.plusSeconds(900),
+                status == InvoiceStatus.PAID ? NOW.minusSeconds(20) : null);
     }
 
     private static AuthorizationPort grantAll() {
@@ -419,6 +602,14 @@ final class PaymentUseCaseTest {
         }
 
         @Override
+        public Optional<Invoice> findActiveByTicketId(UUID ticketId) {
+            return byId.values().stream()
+                    .filter(invoice -> invoice.ticketId().equals(ticketId))
+                    .filter(invoice -> invoice.status() == InvoiceStatus.CREATED || invoice.status() == InvoiceStatus.PENDING)
+                    .findFirst();
+        }
+
+        @Override
         public List<Invoice> findByUserId(UUID userId, int limit, int offset) {
             return byId.values().stream()
                     .filter(invoice -> invoice.userId().equals(userId))
@@ -478,6 +669,36 @@ final class PaymentUseCaseTest {
             return byId.values().stream()
                     .filter(payment -> payment.invoiceId().equals(invoiceId))
                     .skip(offset)
+                    .limit(limit)
+                    .toList();
+        }
+    }
+
+    private static final class InMemoryPaymentOutboxRepository implements PaymentOutboxRepository {
+        private final Map<UUID, PaymentOutboxMessage> byId = new HashMap<>();
+
+        @Override
+        public PaymentOutboxMessage save(PaymentOutboxMessage message) {
+            byId.put(message.id(), message);
+            return message;
+        }
+
+        @Override
+        public PaymentOutboxMessage update(PaymentOutboxMessage message) {
+            byId.put(message.id(), message);
+            return message;
+        }
+
+        @Override
+        public Optional<PaymentOutboxMessage> findById(UUID id) {
+            return Optional.ofNullable(byId.get(id));
+        }
+
+        @Override
+        public List<PaymentOutboxMessage> findDueForProcessing(Instant now, int limit) {
+            return byId.values().stream()
+                    .filter(message -> message.status() == PaymentOutboxStatus.PENDING || message.status() == PaymentOutboxStatus.FAILED)
+                    .filter(message -> !message.nextAttemptAt().isAfter(now))
                     .limit(limit)
                     .toList();
         }

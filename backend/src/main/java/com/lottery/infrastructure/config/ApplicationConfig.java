@@ -24,6 +24,10 @@ import com.lottery.application.usecase.draw.UpdateDrawUseCase;
 import com.lottery.application.usecase.auth.LoginByPasswordUseCase;
 import com.lottery.application.usecase.auth.RegisterUserUseCase;
 import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
+import com.lottery.application.usecase.payment.CancelInvoiceUseCase;
+import com.lottery.application.usecase.payment.ExpireInvoiceUseCase;
+import com.lottery.application.usecase.payment.GetInvoiceUseCase;
+import com.lottery.application.usecase.payment.ProcessPaymentOutboxUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
 import com.lottery.application.usecase.report.GenerateDrawReportUseCase;
@@ -46,6 +50,7 @@ import com.lottery.domain.repository.DrawRepository;
 import com.lottery.domain.repository.DrawResultRepository;
 import com.lottery.domain.repository.InvoiceRepository;
 import com.lottery.domain.repository.PaymentRepository;
+import com.lottery.domain.repository.PaymentOutboxRepository;
 import com.lottery.domain.repository.PaymentWebhookEventRepository;
 import com.lottery.domain.repository.RbacRepository;
 import com.lottery.domain.repository.TicketRepository;
@@ -55,12 +60,14 @@ import com.lottery.domain.service.DomainClock;
 import com.lottery.infrastructure.lottery.JsonCombinationEngine;
 import com.lottery.infrastructure.openapi.OpenApiResource;
 import com.lottery.infrastructure.payment.MockPaymentProviderAdapter;
+import com.lottery.infrastructure.payment.PaymentOutboxWorker;
 import com.lottery.infrastructure.persistence.jdbc.JdbcAuditLogRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcCombinationSchemaRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcDrawRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcDrawResultRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcInvoiceRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentRepository;
+import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentOutboxRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentWebhookEventRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcRbacRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTicketRepository;
@@ -86,6 +93,7 @@ import com.lottery.presentation.rest.draw.DrawItemServlet;
 import com.lottery.presentation.rest.health.HealthServlet;
 import com.lottery.presentation.rest.health.ReadyServlet;
 import com.lottery.presentation.rest.payment.CreateInvoiceServlet;
+import com.lottery.presentation.rest.payment.InvoiceItemServlet;
 import com.lottery.presentation.rest.payment.PaymentWebhookServlet;
 import com.lottery.presentation.rest.payment.RefundPaymentServlet;
 import com.lottery.presentation.rest.report.ReportsServlet;
@@ -120,6 +128,7 @@ public final class ApplicationConfig {
         WinningRuleRepository winningRuleRepository = new JdbcWinningRuleRepository(transactionManager);
         InvoiceRepository invoiceRepository = new JdbcInvoiceRepository(transactionManager);
         PaymentRepository paymentRepository = new JdbcPaymentRepository(transactionManager);
+        PaymentOutboxRepository paymentOutboxRepository = new JdbcPaymentOutboxRepository(transactionManager);
         PaymentWebhookEventRepository paymentWebhookEventRepository = new JdbcPaymentWebhookEventRepository(transactionManager);
         RbacRepository rbacRepository = new JdbcRbacRepository(transactionManager);
         AuditLogRepository auditLogRepository = new JdbcAuditLogRepository(transactionManager);
@@ -256,11 +265,35 @@ public final class ApplicationConfig {
                 ticketRepository,
                 invoiceRepository,
                 paymentRepository,
-                paymentProvider,
+                paymentOutboxRepository,
                 authorizationPort,
                 transactionManager,
                 clock,
                 new InvoiceMapper());
+        GetInvoiceUseCase getInvoiceUseCase = new GetInvoiceUseCase(
+                invoiceRepository,
+                authorizationPort,
+                transactionManager,
+                new InvoiceMapper());
+        CancelInvoiceUseCase cancelInvoiceUseCase = new CancelInvoiceUseCase(
+                invoiceRepository,
+                paymentRepository,
+                ticketRepository,
+                paymentOutboxRepository,
+                authorizationPort,
+                transactionManager,
+                clock,
+                new InvoiceMapper());
+        ExpireInvoiceUseCase expireInvoiceUseCase = new ExpireInvoiceUseCase(cancelInvoiceUseCase);
+        ProcessPaymentOutboxUseCase processPaymentOutboxUseCase = new ProcessPaymentOutboxUseCase(
+                paymentOutboxRepository,
+                invoiceRepository,
+                paymentRepository,
+                ticketRepository,
+                paymentProvider,
+                transactionManager,
+                clock,
+                objectMapper);
         ProcessPaymentWebhookUseCase processPaymentWebhookUseCase = new ProcessPaymentWebhookUseCase(
                 paymentWebhookEventRepository,
                 invoiceRepository,
@@ -274,7 +307,7 @@ public final class ApplicationConfig {
                 paymentRepository,
                 invoiceRepository,
                 ticketRepository,
-                paymentProvider,
+                paymentOutboxRepository,
                 authorizationPort,
                 transactionManager,
                 clock,
@@ -366,6 +399,15 @@ public final class ApplicationConfig {
                 new ServletHolder(new PaymentWebhookServlet(objectMapper, errorHandler, processPaymentWebhookUseCase)),
                 "/api/v1/payment-providers/*");
         context.addServlet(
+                new ServletHolder(new InvoiceItemServlet(
+                        objectMapper,
+                        errorHandler,
+                        getInvoiceUseCase,
+                        cancelInvoiceUseCase,
+                        expireInvoiceUseCase,
+                        contextFactory)),
+                "/api/v1/invoices/*");
+        context.addServlet(
                 new ServletHolder(new RefundPaymentServlet(objectMapper, errorHandler, refundPaymentUseCase, contextFactory)),
                 "/api/v1/payments/*");
         context.addServlet(
@@ -394,6 +436,7 @@ public final class ApplicationConfig {
 
         Server server = new Server(properties.httpPort());
         server.setHandler(context);
+        server.addBean(new PaymentOutboxWorker(processPaymentOutboxUseCase, 50, 10));
         server.setStopAtShutdown(true);
         return server;
     }

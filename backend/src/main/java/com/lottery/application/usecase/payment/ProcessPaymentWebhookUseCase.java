@@ -82,16 +82,33 @@ public final class ProcessPaymentWebhookUseCase {
             Payment payment = paymentRepository.findByInvoiceId(invoice.id()).orElseThrow(() -> new NotFoundException("Payment"));
             Ticket ticket = ticketRepository.findById(invoice.ticketId()).orElseThrow(() -> new NotFoundException("Ticket"));
             Instant now = clock.now();
-            if ("PAYMENT_SUCCEEDED".equals(payload.eventType())) {
-                invoiceRepository.update(invoice.withStatus(InvoiceStatus.PAID, now));
-                paymentRepository.update(payment.withStatus(PaymentStatus.CAPTURED, now));
-                ticketRepository.update(ticket.withPaymentStatus(TicketStatus.PAID, now));
-            } else if ("PAYMENT_FAILED".equals(payload.eventType())) {
-                invoiceRepository.update(invoice.withStatus(InvoiceStatus.FAILED, now));
-                paymentRepository.update(payment.withStatus(PaymentStatus.FAILED, now));
-                ticketRepository.update(ticket.withPaymentStatus(TicketStatus.PAYMENT_FAILED, now));
-            } else {
-                throw new ConflictException("PAYMENT_WEBHOOK_UNSUPPORTED_EVENT", "Unsupported payment webhook event");
+            switch (payload.eventType()) {
+                case "PAYMENT_AUTHORIZED" -> {
+                    invoiceRepository.update(invoice.withStatus(InvoiceStatus.PENDING, now));
+                    paymentRepository.update(payment.withStatus(PaymentStatus.AUTHORIZED, now));
+                    ticketRepository.update(ticket.withPaymentStatus(TicketStatus.PAYMENT_PENDING, now));
+                }
+                case "PAYMENT_SUCCEEDED" -> {
+                    invoiceRepository.update(invoice.withStatus(InvoiceStatus.PAID, now));
+                    paymentRepository.update(payment.withStatus(PaymentStatus.CAPTURED, now));
+                    ticketRepository.update(ticket.withPaymentStatus(TicketStatus.PAID, now));
+                }
+                case "PAYMENT_FAILED" -> {
+                    invoiceRepository.update(invoice.withStatus(InvoiceStatus.FAILED, now));
+                    paymentRepository.update(payment.withStatus(PaymentStatus.FAILED, now));
+                    ticketRepository.update(ticket.withPaymentStatus(TicketStatus.PAYMENT_FAILED, now));
+                }
+                case "PAYMENT_CANCELLED" -> {
+                    invoiceRepository.update(invoice.withStatus(InvoiceStatus.CANCELLED, now));
+                    paymentRepository.update(payment.withStatus(PaymentStatus.CANCELLED, now));
+                    ticketRepository.update(ticket.withPaymentReleased(now));
+                }
+                case "PAYMENT_EXPIRED" -> {
+                    invoiceRepository.update(invoice.withStatus(InvoiceStatus.EXPIRED, now));
+                    paymentRepository.update(payment.withStatus(PaymentStatus.CANCELLED, now));
+                    ticketRepository.update(ticket.withPaymentReleased(now));
+                }
+                default -> throw new ConflictException("PAYMENT_WEBHOOK_UNSUPPORTED_EVENT", "Unsupported payment webhook event");
             }
             webhookEventRepository.update(event.markProcessed());
             return new PaymentWebhookResultDto(event.id(), true, false, payload.eventType());

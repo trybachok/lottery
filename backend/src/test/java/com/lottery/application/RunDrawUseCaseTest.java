@@ -422,6 +422,14 @@ final class RunDrawUseCaseTest {
         }
 
         @Override
+        public Optional<Invoice> findActiveByTicketId(UUID ticketId) {
+            return byId.values().stream()
+                    .filter(invoice -> invoice.ticketId().equals(ticketId))
+                    .filter(invoice -> invoice.status() == InvoiceStatus.CREATED || invoice.status() == InvoiceStatus.PENDING)
+                    .findFirst();
+        }
+
+        @Override
         public List<Invoice> findByTicketId(UUID ticketId) {
             return byId.values().stream()
                     .filter(invoice -> invoice.ticketId().equals(ticketId))

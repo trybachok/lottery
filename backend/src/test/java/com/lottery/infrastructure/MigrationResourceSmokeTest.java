@@ -48,6 +48,17 @@ final class MigrationResourceSmokeTest {
         }
     }
 
+    @Test
+    void paymentOutboxMigrationContainsRetryTableAndIndexes() throws IOException {
+        String migration = resource("/db/migration/V3__payment_outbox.sql");
+
+        assertTrue(migration.contains("create table payment_outbox"), "payment outbox table is required");
+        assertTrue(migration.contains("create_invoice"), "create invoice outbox type is required");
+        assertTrue(migration.contains("refund_payment"), "refund outbox type is required");
+        assertTrue(migration.contains("idx_payment_outbox_due"), "due index is required for retry worker");
+        assertTrue(migration.contains("payment_url"), "invoice payment URL persistence is required");
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing migration resource: " + path);

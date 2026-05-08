@@ -359,6 +359,27 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /draws/{drawId}/result:
+    get:
+      operationId: getDrawResult
+      summary: Get draw result
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DrawResult'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
   /tickets:
     get:
       operationId: getTickets
@@ -1568,6 +1589,36 @@ components:
         completedAt:
           type: string
           format: date-time
+    DrawResult:
+      type: object
+      required: [id, drawId, winningCombinationValues, algorithmVersion, randomProvider, generatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        drawId:
+          type: string
+          format: uuid
+        winningCombinationValues:
+          type: array
+          items:
+            type: string
+        algorithmVersion:
+          type: string
+        randomProvider:
+          type: string
+        proofHash:
+          type: string
+        generatedBy:
+          type: string
+          format: uuid
+        generatedAt:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+        correlationId:
+          type: string
     CreateTicketRequest:
       type: object
       required: [userId, drawId, combinationValues, priceAmount, priceCurrency]
@@ -1636,6 +1687,9 @@ components:
         test:
           type: boolean
         createdAt:
+          type: string
+          format: date-time
+        participatedAt:
           type: string
           format: date-time
         checkedAt:

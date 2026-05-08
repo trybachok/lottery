@@ -22,6 +22,7 @@ public final class Ticket {
     private final boolean test;
     private final Instant createdAt;
     private final Instant paidAt;
+    private final Instant participatedAt;
     private final Instant checkedAt;
     private final Instant cancelledAt;
     private final Instant deletedAt;
@@ -39,6 +40,7 @@ public final class Ticket {
             boolean test,
             Instant createdAt,
             Instant paidAt,
+            Instant participatedAt,
             Instant checkedAt,
             Instant cancelledAt,
             Instant deletedAt,
@@ -54,10 +56,46 @@ public final class Ticket {
         this.test = test;
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
         this.paidAt = paidAt;
+        this.participatedAt = participatedAt;
         this.checkedAt = checkedAt;
         this.cancelledAt = cancelledAt;
         this.deletedAt = deletedAt;
         this.version = version;
+    }
+
+    public Ticket(
+            UUID id,
+            UUID userId,
+            UUID drawId,
+            TicketStatus status,
+            Combination combination,
+            Money price,
+            BigDecimal matchPercent,
+            UUID prizeId,
+            boolean test,
+            Instant createdAt,
+            Instant paidAt,
+            Instant checkedAt,
+            Instant cancelledAt,
+            Instant deletedAt,
+            long version) {
+        this(
+                id,
+                userId,
+                drawId,
+                status,
+                combination,
+                price,
+                matchPercent,
+                prizeId,
+                test,
+                createdAt,
+                paidAt,
+                null,
+                checkedAt,
+                cancelledAt,
+                deletedAt,
+                version);
     }
 
     public static Ticket create(UUID userId, UUID drawId, Combination combination, Money price, boolean test, Instant now) {
@@ -76,10 +114,20 @@ public final class Ticket {
                 null,
                 null,
                 null,
+                null,
                 0);
     }
 
     public Ticket withDrawResult(TicketStatus resultStatus, BigDecimal matchPercent, UUID prizeId, Instant checkedAt) {
+        return withDrawResult(resultStatus, matchPercent, prizeId, checkedAt, checkedAt);
+    }
+
+    public Ticket withDrawResult(
+            TicketStatus resultStatus,
+            BigDecimal matchPercent,
+            UUID prizeId,
+            Instant participatedAt,
+            Instant checkedAt) {
         if (resultStatus != TicketStatus.WIN && resultStatus != TicketStatus.LOSE) {
             throw new IllegalArgumentException("Ticket result status must be WIN or LOSE");
         }
@@ -95,6 +143,27 @@ public final class Ticket {
                 test,
                 createdAt,
                 paidAt,
+                participatedAt,
+                checkedAt,
+                cancelledAt,
+                deletedAt,
+                version);
+    }
+
+    public Ticket withNotParticipated(Instant checkedAt) {
+        return new Ticket(
+                id,
+                userId,
+                drawId,
+                TicketStatus.NOT_PARTICIPATED,
+                combination,
+                price,
+                matchPercent,
+                prizeId,
+                test,
+                createdAt,
+                paidAt,
+                participatedAt,
                 checkedAt,
                 cancelledAt,
                 deletedAt,
@@ -121,6 +190,7 @@ public final class Ticket {
                 test,
                 createdAt,
                 newStatus == TicketStatus.PAID ? now : paidAt,
+                participatedAt,
                 checkedAt,
                 cancelledAt,
                 deletedAt,
@@ -148,6 +218,7 @@ public final class Ticket {
                 test,
                 createdAt,
                 paidAt,
+                participatedAt,
                 checkedAt,
                 now,
                 deletedAt,
@@ -174,6 +245,7 @@ public final class Ticket {
                 test,
                 createdAt,
                 paidAt,
+                participatedAt,
                 checkedAt,
                 cancelledAt,
                 now,
@@ -222,6 +294,10 @@ public final class Ticket {
 
     public Optional<Instant> paidAt() {
         return Optional.ofNullable(paidAt);
+    }
+
+    public Optional<Instant> participatedAt() {
+        return Optional.ofNullable(participatedAt);
     }
 
     public Optional<Instant> checkedAt() {

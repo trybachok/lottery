@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.audit.AuditService;
 import com.lottery.application.mapper.AuditLogMapper;
 import com.lottery.application.mapper.DrawMapper;
+import com.lottery.application.mapper.DrawResultMapper;
 import com.lottery.application.mapper.InvoiceMapper;
 import com.lottery.application.mapper.PaymentMapper;
 import com.lottery.application.mapper.TicketMapper;
@@ -16,6 +17,7 @@ import com.lottery.application.usecase.draw.CreateDrawUseCase;
 import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase;
 import com.lottery.application.usecase.draw.AssignDrawManagerUseCase;
 import com.lottery.application.usecase.draw.GetDrawUseCase;
+import com.lottery.application.usecase.draw.GetDrawResultUseCase;
 import com.lottery.application.usecase.draw.ListDrawsUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
 import com.lottery.application.usecase.draw.UpdateDrawUseCase;
@@ -37,6 +39,7 @@ import com.lottery.application.usecase.ticket.TicketCreationService;
 import com.lottery.application.usecase.user.CreateUserUseCase;
 import com.lottery.domain.policy.TicketPurchasePolicy;
 import com.lottery.domain.policy.DrawStatusTransitionPolicy;
+import com.lottery.domain.policy.TicketParticipationPolicy;
 import com.lottery.domain.repository.AuditLogRepository;
 import com.lottery.domain.repository.CombinationSchemaRepository;
 import com.lottery.domain.repository.DrawRepository;
@@ -189,13 +192,22 @@ public final class ApplicationConfig {
                 drawResultRepository,
                 ticketRepository,
                 winningRuleRepository,
+                invoiceRepository,
+                paymentRepository,
                 authorizationPort,
                 transactionManager,
                 combinationEngine,
                 combinationEngine,
                 new DrawStatusTransitionPolicy(),
+                new TicketParticipationPolicy(),
                 clock,
                 auditService);
+        GetDrawResultUseCase getDrawResultUseCase = new GetDrawResultUseCase(
+                drawRepository,
+                drawResultRepository,
+                authorizationPort,
+                transactionManager,
+                new DrawResultMapper());
         TicketCreationService ticketCreationService = new TicketCreationService(
                 userRepository,
                 drawRepository,
@@ -331,6 +343,7 @@ public final class ApplicationConfig {
                         updateDrawUseCase,
                         changeDrawStatusUseCase,
                         runDrawUseCase,
+                        getDrawResultUseCase,
                         contextFactory)),
                 "/api/v1/draws/*");
         context.addServlet(

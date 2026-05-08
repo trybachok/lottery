@@ -30,9 +30,10 @@ public final class JdbcDrawResultRepository implements DrawResultRepository {
     public DrawResult save(DrawResult drawResult) {
         String sql = """
                 insert into draw_results (
-                  id, draw_id, winning_combination_json, algorithm_version, random_provider, proof_hash, generated_by, generated_at
+                  id, draw_id, winning_combination_json, algorithm_version, random_provider, proof_hash,
+                  generated_by, generated_at, request_id, correlation_id
                 )
-                values (?, ?, ?::jsonb, ?, ?, ?, ?, ?)
+                values (?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try {
             Connection connection = connectionProvider.currentConnection();
@@ -45,6 +46,8 @@ public final class JdbcDrawResultRepository implements DrawResultRepository {
                 statement.setString(6, drawResult.maybeProofHash().orElse(null));
                 statement.setObject(7, drawResult.generatedBy());
                 JdbcSupport.setInstant(statement, 8, drawResult.generatedAt());
+                statement.setString(9, drawResult.maybeRequestId().orElse(null));
+                statement.setString(10, drawResult.maybeCorrelationId().orElse(null));
                 statement.executeUpdate();
                 return drawResult;
             }
@@ -56,7 +59,8 @@ public final class JdbcDrawResultRepository implements DrawResultRepository {
     @Override
     public Optional<DrawResult> findByDrawId(UUID drawId) {
         String sql = """
-                select id, draw_id, winning_combination_json, algorithm_version, random_provider, proof_hash, generated_by, generated_at
+                select id, draw_id, winning_combination_json, algorithm_version, random_provider, proof_hash,
+                       generated_by, generated_at, request_id, correlation_id
                 from draw_results
                 where draw_id = ?
                 """;
@@ -98,6 +102,8 @@ public final class JdbcDrawResultRepository implements DrawResultRepository {
                 resultSet.getString("random_provider"),
                 resultSet.getString("proof_hash"),
                 resultSet.getObject("generated_by", UUID.class),
-                resultSet.getTimestamp("generated_at").toInstant());
+                resultSet.getTimestamp("generated_at").toInstant(),
+                resultSet.getString("request_id"),
+                resultSet.getString("correlation_id"));
     }
 }

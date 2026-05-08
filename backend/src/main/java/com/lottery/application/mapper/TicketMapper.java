@@ -17,6 +17,7 @@ public final class TicketMapper {
                 ticket.prizeId().orElse(null),
                 ticket.test(),
                 ticket.createdAt(),
+                ticket.participatedAt().orElse(null),
                 ticket.checkedAt().orElse(null),
                 ticket.version());
     }

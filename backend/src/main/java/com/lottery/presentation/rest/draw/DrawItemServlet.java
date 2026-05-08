@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.NotFoundException;
 import com.lottery.application.command.UpdateDrawCommand;
 import com.lottery.application.dto.DrawDto;
+import com.lottery.application.dto.DrawResultDto;
 import com.lottery.application.dto.RunDrawResultDto;
 import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase;
 import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase.DrawLifecycleAction;
 import com.lottery.application.usecase.draw.GetDrawUseCase;
+import com.lottery.application.usecase.draw.GetDrawResultUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
 import com.lottery.application.usecase.draw.UpdateDrawUseCase;
 import com.lottery.presentation.error.GlobalErrorHandler;
@@ -25,6 +27,7 @@ public final class DrawItemServlet extends JsonServlet {
     private final UpdateDrawUseCase updateDrawUseCase;
     private final ChangeDrawStatusUseCase changeStatusUseCase;
     private final RunDrawUseCase runDrawUseCase;
+    private final GetDrawResultUseCase getDrawResultUseCase;
     private final ServletUseCaseContextFactory contextFactory;
 
     public DrawItemServlet(
@@ -34,12 +37,14 @@ public final class DrawItemServlet extends JsonServlet {
             UpdateDrawUseCase updateDrawUseCase,
             ChangeDrawStatusUseCase changeStatusUseCase,
             RunDrawUseCase runDrawUseCase,
+            GetDrawResultUseCase getDrawResultUseCase,
             ServletUseCaseContextFactory contextFactory) {
         super(objectMapper, errorHandler);
         this.getDrawUseCase = getDrawUseCase;
         this.updateDrawUseCase = updateDrawUseCase;
         this.changeStatusUseCase = changeStatusUseCase;
         this.runDrawUseCase = runDrawUseCase;
+        this.getDrawResultUseCase = getDrawResultUseCase;
         this.contextFactory = contextFactory;
     }
 
@@ -57,6 +62,11 @@ public final class DrawItemServlet extends JsonServlet {
         try {
             PathParts path = path(request);
             if (path.action() != null) {
+                if ("result".equals(path.action())) {
+                    DrawResultDto result = getDrawResultUseCase.execute(path.drawId(), contextFactory.from(request));
+                    writeJson(response, 200, result);
+                    return;
+                }
                 throw new NotFoundException("Endpoint");
             }
             DrawDto result = getDrawUseCase.execute(path.drawId(), contextFactory.from(request));

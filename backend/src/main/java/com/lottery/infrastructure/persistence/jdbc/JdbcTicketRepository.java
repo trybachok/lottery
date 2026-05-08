@@ -38,9 +38,9 @@ public final class JdbcTicketRepository implements TicketRepository {
         String sql = """
                 insert into tickets (
                   id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
-                  prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                  prize_id, is_test, created_at, paid_at, participated_at, checked_at, cancelled_at, deleted_at, version
                 )
-                values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try {
             Connection connection = connectionProvider.currentConnection();
@@ -57,10 +57,11 @@ public final class JdbcTicketRepository implements TicketRepository {
                 statement.setBoolean(10, ticket.test());
                 JdbcSupport.setInstant(statement, 11, ticket.createdAt());
                 JdbcSupport.setInstant(statement, 12, ticket.paidAt().orElse(null));
-                JdbcSupport.setInstant(statement, 13, ticket.checkedAt().orElse(null));
-                JdbcSupport.setInstant(statement, 14, ticket.cancelledAt().orElse(null));
-                JdbcSupport.setInstant(statement, 15, ticket.deletedAt().orElse(null));
-                statement.setLong(16, ticket.version());
+                JdbcSupport.setInstant(statement, 13, ticket.participatedAt().orElse(null));
+                JdbcSupport.setInstant(statement, 14, ticket.checkedAt().orElse(null));
+                JdbcSupport.setInstant(statement, 15, ticket.cancelledAt().orElse(null));
+                JdbcSupport.setInstant(statement, 16, ticket.deletedAt().orElse(null));
+                statement.setLong(17, ticket.version());
                 statement.executeUpdate();
                 return ticket;
             }
@@ -91,7 +92,7 @@ public final class JdbcTicketRepository implements TicketRepository {
                 statement.setObject(8, ticket.prizeId().orElse(null));
                 statement.setBoolean(9, ticket.test());
                 JdbcSupport.setInstant(statement, 10, ticket.paidAt().orElse(null));
-                JdbcSupport.setInstant(statement, 11, null);
+                JdbcSupport.setInstant(statement, 11, ticket.participatedAt().orElse(null));
                 JdbcSupport.setInstant(statement, 12, ticket.checkedAt().orElse(null));
                 JdbcSupport.setInstant(statement, 13, ticket.cancelledAt().orElse(null));
                 JdbcSupport.setInstant(statement, 14, ticket.deletedAt().orElse(null));
@@ -113,6 +114,7 @@ public final class JdbcTicketRepository implements TicketRepository {
                         ticket.test(),
                         ticket.createdAt(),
                         ticket.paidAt().orElse(null),
+                        ticket.participatedAt().orElse(null),
                         ticket.checkedAt().orElse(null),
                         ticket.cancelledAt().orElse(null),
                         ticket.deletedAt().orElse(null),
@@ -127,7 +129,7 @@ public final class JdbcTicketRepository implements TicketRepository {
     public Optional<Ticket> findById(UUID id) {
         String sql = """
                 select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
-                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                       prize_id, is_test, created_at, paid_at, participated_at, checked_at, cancelled_at, deleted_at, version
                 from tickets
                 where id = ? and deleted_at is null
                 """;
@@ -148,7 +150,7 @@ public final class JdbcTicketRepository implements TicketRepository {
     public List<Ticket> findAll(int limit, int offset) {
         return findMany("""
                 select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
-                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                       prize_id, is_test, created_at, paid_at, participated_at, checked_at, cancelled_at, deleted_at, version
                 from tickets
                 where deleted_at is null
                 order by created_at desc
@@ -163,7 +165,7 @@ public final class JdbcTicketRepository implements TicketRepository {
     public List<Ticket> findByUserId(UUID userId, int limit, int offset) {
         return findMany("""
                 select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
-                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                       prize_id, is_test, created_at, paid_at, participated_at, checked_at, cancelled_at, deleted_at, version
                 from tickets
                 where user_id = ? and deleted_at is null
                 order by created_at desc
@@ -179,7 +181,7 @@ public final class JdbcTicketRepository implements TicketRepository {
     public List<Ticket> findPaidByDrawId(UUID drawId) {
         return findMany("""
                 select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
-                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                       prize_id, is_test, created_at, paid_at, participated_at, checked_at, cancelled_at, deleted_at, version
                 from tickets
                 where draw_id = ? and status = 'PAID' and cancelled_at is null and deleted_at is null
                 order by created_at asc
@@ -219,7 +221,7 @@ public final class JdbcTicketRepository implements TicketRepository {
             int offset) {
         StringBuilder sql = new StringBuilder("""
                 select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
-                       prize_id, is_test, created_at, paid_at, checked_at, cancelled_at, deleted_at, version
+                       prize_id, is_test, created_at, paid_at, participated_at, checked_at, cancelled_at, deleted_at, version
                 from tickets
                 where deleted_at is null
                 """);
@@ -275,6 +277,7 @@ public final class JdbcTicketRepository implements TicketRepository {
 
     private Ticket map(ResultSet resultSet) throws SQLException, JsonProcessingException {
         Timestamp paidAt = resultSet.getTimestamp("paid_at");
+        Timestamp participatedAt = resultSet.getTimestamp("participated_at");
         Timestamp checkedAt = resultSet.getTimestamp("checked_at");
         Timestamp cancelledAt = resultSet.getTimestamp("cancelled_at");
         Timestamp deletedAt = resultSet.getTimestamp("deleted_at");
@@ -291,6 +294,7 @@ public final class JdbcTicketRepository implements TicketRepository {
                 resultSet.getBoolean("is_test"),
                 resultSet.getTimestamp("created_at").toInstant(),
                 paidAt == null ? null : paidAt.toInstant(),
+                participatedAt == null ? null : participatedAt.toInstant(),
                 checkedAt == null ? null : checkedAt.toInstant(),
                 cancelledAt == null ? null : cancelledAt.toInstant(),
                 deletedAt == null ? null : deletedAt.toInstant(),

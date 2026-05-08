@@ -107,6 +107,32 @@ public final class JdbcInvoiceRepository implements InvoiceRepository {
     }
 
     @Override
+    public List<Invoice> findByTicketId(UUID ticketId) {
+        String sql = """
+                select id, ticket_id, user_id, provider_code, status, amount, currency, external_invoice_id,
+                       idempotency_key, created_at, expires_at, paid_at
+                from invoices
+                where ticket_id = ?
+                order by created_at desc
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, ticketId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<Invoice> invoices = new ArrayList<>();
+                    while (resultSet.next()) {
+                        invoices.add(map(resultSet));
+                    }
+                    return invoices;
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to list ticket invoices", exception);
+        }
+    }
+
+    @Override
     public List<Invoice> findByUserId(UUID userId, int limit, int offset) {
         String sql = """
                 select id, ticket_id, user_id, provider_code, status, amount, currency, external_invoice_id,

@@ -22,6 +22,7 @@ public final class ServletUseCaseContextFactory {
                 principal.userId(),
                 rbacRepository.findPermissionCodesByUserId(principal.userId()),
                 requestId(request),
+                correlationId(request),
                 rbacRepository.findRoleCodesByUserId(principal.userId()),
                 request.getRemoteAddr(),
                 request.getHeader("User-Agent"));
@@ -33,6 +34,14 @@ public final class ServletUseCaseContextFactory {
             return requestContext.requestId();
         }
         return "req_unknown";
+    }
+
+    private String correlationId(HttpServletRequest request) {
+        Object value = request.getAttribute(RequestContext.ATTRIBUTE_NAME);
+        if (value instanceof RequestContext requestContext) {
+            return requestContext.correlationId();
+        }
+        return null;
     }
 
     private String bearerToken(HttpServletRequest request) {

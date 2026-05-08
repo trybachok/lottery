@@ -17,6 +17,7 @@ public record TicketDto(
         UUID prizeId,
         boolean test,
         Instant createdAt,
+        Instant participatedAt,
         Instant checkedAt,
         long version) {
     public TicketDto {

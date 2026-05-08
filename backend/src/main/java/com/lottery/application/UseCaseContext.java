@@ -7,6 +7,7 @@ public record UseCaseContext(
         UUID actorUserId,
         Set<String> permissions,
         String requestId,
+        String correlationId,
         Set<String> actorRoleCodes,
         String ipAddress,
         String userAgent) {
@@ -16,7 +17,17 @@ public record UseCaseContext(
     }
 
     public UseCaseContext(UUID actorUserId, Set<String> permissions, String requestId) {
-        this(actorUserId, permissions, requestId, Set.of(), null, null);
+        this(actorUserId, permissions, requestId, null, Set.of(), null, null);
+    }
+
+    public UseCaseContext(
+            UUID actorUserId,
+            Set<String> permissions,
+            String requestId,
+            Set<String> actorRoleCodes,
+            String ipAddress,
+            String userAgent) {
+        this(actorUserId, permissions, requestId, null, actorRoleCodes, ipAddress, userAgent);
     }
 
     public static UseCaseContext anonymous(String requestId) {

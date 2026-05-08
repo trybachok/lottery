@@ -26,8 +26,14 @@ import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
 import com.lottery.application.usecase.report.GenerateDrawReportUseCase;
 import com.lottery.application.usecase.report.GenerateTicketReportUseCase;
+import com.lottery.application.usecase.ticket.BulkCreateTicketsUseCase;
+import com.lottery.application.usecase.ticket.CancelTicketUseCase;
+import com.lottery.application.usecase.ticket.CheckTicketResultUseCase;
 import com.lottery.application.usecase.ticket.CreateTicketUseCase;
+import com.lottery.application.usecase.ticket.DeleteTicketUseCase;
+import com.lottery.application.usecase.ticket.GetTicketUseCase;
 import com.lottery.application.usecase.ticket.ListTicketsUseCase;
+import com.lottery.application.usecase.ticket.TicketCreationService;
 import com.lottery.application.usecase.user.CreateUserUseCase;
 import com.lottery.domain.policy.TicketPurchasePolicy;
 import com.lottery.domain.policy.DrawStatusTransitionPolicy;
@@ -81,6 +87,7 @@ import com.lottery.presentation.rest.payment.PaymentWebhookServlet;
 import com.lottery.presentation.rest.payment.RefundPaymentServlet;
 import com.lottery.presentation.rest.report.ReportsServlet;
 import com.lottery.presentation.rest.ticket.CreateTicketServlet;
+import com.lottery.presentation.rest.ticket.TicketItemServlet;
 import com.lottery.presentation.rest.user.CreateUserServlet;
 import jakarta.servlet.DispatcherType;
 import java.util.EnumSet;
@@ -189,17 +196,47 @@ public final class ApplicationConfig {
                 new DrawStatusTransitionPolicy(),
                 clock,
                 auditService);
-        CreateTicketUseCase createTicketUseCase = new CreateTicketUseCase(
+        TicketCreationService ticketCreationService = new TicketCreationService(
                 userRepository,
                 drawRepository,
+                ticketRepository,
+                combinationSchemaRepository,
+                authorizationPort,
+                combinationEngine,
+                clock,
+                new TicketPurchasePolicy());
+        CreateTicketUseCase createTicketUseCase = new CreateTicketUseCase(
+                transactionManager,
+                ticketCreationService,
+                new TicketMapper());
+        BulkCreateTicketsUseCase bulkCreateTicketsUseCase = new BulkCreateTicketsUseCase(
+                transactionManager,
+                ticketCreationService,
+                new TicketMapper());
+        ListTicketsUseCase listTicketsUseCase = new ListTicketsUseCase(
+                ticketRepository,
+                authorizationPort,
+                transactionManager,
+                new TicketMapper());
+        GetTicketUseCase getTicketUseCase = new GetTicketUseCase(
+                ticketRepository,
+                authorizationPort,
+                transactionManager,
+                new TicketMapper());
+        CancelTicketUseCase cancelTicketUseCase = new CancelTicketUseCase(
                 ticketRepository,
                 authorizationPort,
                 transactionManager,
                 clock,
-                new TicketPurchasePolicy(),
                 new TicketMapper());
-        ListTicketsUseCase listTicketsUseCase = new ListTicketsUseCase(
+        DeleteTicketUseCase deleteTicketUseCase = new DeleteTicketUseCase(
                 ticketRepository,
+                authorizationPort,
+                transactionManager,
+                clock);
+        CheckTicketResultUseCase checkTicketResultUseCase = new CheckTicketResultUseCase(
+                ticketRepository,
+                drawResultRepository,
                 authorizationPort,
                 transactionManager,
                 new TicketMapper());
@@ -301,7 +338,16 @@ public final class ApplicationConfig {
                         new CreateTicketServlet(objectMapper, errorHandler, createTicketUseCase, listTicketsUseCase, contextFactory)),
                 "/api/v1/tickets");
         context.addServlet(
-                new ServletHolder(new CreateInvoiceServlet(objectMapper, errorHandler, createInvoiceForTicketUseCase, contextFactory)),
+                new ServletHolder(new TicketItemServlet(
+                        objectMapper,
+                        errorHandler,
+                        getTicketUseCase,
+                        bulkCreateTicketsUseCase,
+                        cancelTicketUseCase,
+                        deleteTicketUseCase,
+                        checkTicketResultUseCase,
+                        createInvoiceForTicketUseCase,
+                        contextFactory)),
                 "/api/v1/tickets/*");
         context.addServlet(
                 new ServletHolder(new PaymentWebhookServlet(objectMapper, errorHandler, processPaymentWebhookUseCase)),

@@ -127,6 +127,59 @@ public final class Ticket {
                 version);
     }
 
+    public Ticket withCancelled(Instant now) {
+        if (status == TicketStatus.PAID
+                || status == TicketStatus.WIN
+                || status == TicketStatus.LOSE
+                || status == TicketStatus.REFUND_PENDING
+                || status == TicketStatus.REFUNDED
+                || status == TicketStatus.DELETED) {
+            throw new IllegalStateException("Ticket cannot be cancelled from status: " + status);
+        }
+        return new Ticket(
+                id,
+                userId,
+                drawId,
+                TicketStatus.CANCELLED,
+                combination,
+                price,
+                matchPercent,
+                prizeId,
+                test,
+                createdAt,
+                paidAt,
+                checkedAt,
+                now,
+                deletedAt,
+                version);
+    }
+
+    public Ticket withDeleted(Instant now) {
+        if (status == TicketStatus.PAID
+                || status == TicketStatus.PAYMENT_PENDING
+                || status == TicketStatus.WIN
+                || status == TicketStatus.LOSE
+                || status == TicketStatus.REFUND_PENDING) {
+            throw new IllegalStateException("Ticket cannot be deleted from status: " + status);
+        }
+        return new Ticket(
+                id,
+                userId,
+                drawId,
+                TicketStatus.DELETED,
+                combination,
+                price,
+                matchPercent,
+                prizeId,
+                test,
+                createdAt,
+                paidAt,
+                checkedAt,
+                cancelledAt,
+                now,
+                version);
+    }
+
     public UUID id() {
         return id;
     }

@@ -13,8 +13,11 @@ public record TicketDto(
         List<String> combinationValues,
         BigDecimal priceAmount,
         String priceCurrency,
+        BigDecimal matchPercent,
+        UUID prizeId,
         boolean test,
         Instant createdAt,
+        Instant checkedAt,
         long version) {
     public TicketDto {
         combinationValues = List.copyOf(combinationValues);

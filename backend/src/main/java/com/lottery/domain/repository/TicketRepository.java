@@ -20,6 +20,10 @@ public interface TicketRepository {
 
     List<Ticket> findPaidByDrawId(UUID drawId);
 
+    default long countActiveByDrawId(UUID drawId) {
+        return findReport(null, drawId, null, null, null, Integer.MAX_VALUE, 0).size();
+    }
+
     default List<Ticket> findReport(
             UUID userId,
             UUID drawId,

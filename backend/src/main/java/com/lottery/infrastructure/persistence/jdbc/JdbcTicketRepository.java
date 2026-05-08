@@ -188,6 +188,27 @@ public final class JdbcTicketRepository implements TicketRepository {
     }
 
     @Override
+    public long countActiveByDrawId(UUID drawId) {
+        String sql = """
+                select count(*)
+                from tickets
+                where draw_id = ? and deleted_at is null and status <> 'DELETED'
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, drawId);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    resultSet.next();
+                    return resultSet.getLong(1);
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to count draw tickets", exception);
+        }
+    }
+
+    @Override
     public List<Ticket> findReport(
             UUID userId,
             UUID drawId,

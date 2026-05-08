@@ -3,6 +3,7 @@ package com.lottery.infrastructure.lottery;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.port.lottery.CombinationEvaluatorPort;
+import com.lottery.application.port.lottery.CombinationValidatorPort;
 import com.lottery.application.port.lottery.WinningCombinationGeneratorPort;
 import com.lottery.domain.model.CombinationSchema;
 import com.lottery.domain.valueobject.Combination;
@@ -18,7 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class JsonCombinationEngine implements WinningCombinationGeneratorPort, CombinationEvaluatorPort {
+public final class JsonCombinationEngine implements WinningCombinationGeneratorPort, CombinationEvaluatorPort, CombinationValidatorPort {
     private static final String ALGORITHM_VERSION = "json-schema-secure-random-v1";
     private static final String RANDOM_PROVIDER = "SecureRandom";
 
@@ -58,6 +59,31 @@ public final class JsonCombinationEngine implements WinningCombinationGeneratorP
     }
 
     @Override
+    public void validate(Combination combination, CombinationSchema schema) {
+        try {
+            JsonNode root = objectMapper.readTree(schema.definition().document());
+            JsonNode positions = root.path("positions");
+            if (!positions.isArray() || positions.isEmpty()) {
+                throw new IllegalArgumentException("Combination schema positions must be a non-empty array");
+            }
+            List<String> values = combination.values();
+            if (values.size() != positions.size()) {
+                throw new IllegalArgumentException("Combination length does not match schema");
+            }
+            if (!root.path("allowDuplicates").asBoolean(true) && values.stream().distinct().count() != values.size()) {
+                throw new IllegalArgumentException("Combination duplicates are not allowed");
+            }
+            for (int index = 0; index < positions.size(); index++) {
+                validateValue(values.get(index), positions.get(index));
+            }
+        } catch (IllegalArgumentException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Failed to validate combination", exception);
+        }
+    }
+
+    @Override
     public BigDecimal matchPercent(Combination ticketCombination, Combination winningCombination, CombinationSchema schema) {
         try {
             JsonNode root = objectMapper.readTree(schema.definition().document());
@@ -75,6 +101,43 @@ public final class JsonCombinationEngine implements WinningCombinationGeneratorP
                     .divide(BigDecimal.valueOf(winningValues.size()), 2, RoundingMode.HALF_UP);
         } catch (Exception exception) {
             throw new IllegalArgumentException("Failed to evaluate combination", exception);
+        }
+    }
+
+    private void validateValue(String value, JsonNode position) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Combination value must not be blank");
+        }
+        String type = position.path("type").asText();
+        switch (type) {
+            case "NUMBER" -> {
+                int min = position.path("min").asInt(1);
+                int max = position.path("max").asInt(99);
+                int parsed;
+                try {
+                    parsed = Integer.parseInt(value);
+                } catch (NumberFormatException exception) {
+                    throw new IllegalArgumentException("NUMBER combination value must be an integer", exception);
+                }
+                if (parsed < min || parsed > max) {
+                    throw new IllegalArgumentException("NUMBER combination value is outside allowed range");
+                }
+            }
+            case "LETTER" -> {
+                String alphabet = position.path("alphabet").asText("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+                if ("unicode".equalsIgnoreCase(alphabet)) {
+                    if (value.codePointCount(0, value.length()) != 1) {
+                        throw new IllegalArgumentException("LETTER combination value must contain one symbol");
+                    }
+                    return;
+                }
+                if (!alphabet.contains(value)) {
+                    throw new IllegalArgumentException("LETTER combination value is outside allowed alphabet");
+                }
+            }
+            case "EMOJI", "TEXT", "IMAGE" -> {
+            }
+            default -> throw new IllegalArgumentException("Unsupported combination position type: " + type);
         }
     }
 

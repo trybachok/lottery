@@ -13,8 +13,11 @@ public final class TicketMapper {
                 ticket.combination().values(),
                 ticket.price().amount(),
                 ticket.price().currency().getCurrencyCode(),
+                ticket.matchPercent().orElse(null),
+                ticket.prizeId().orElse(null),
                 ticket.test(),
                 ticket.createdAt(),
+                ticket.checkedAt().orElse(null),
                 ticket.version());
     }
 }

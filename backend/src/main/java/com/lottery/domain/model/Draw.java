@@ -146,6 +146,35 @@ public final class Draw {
                 version);
     }
 
+    public Draw withDetails(
+            String newTitle,
+            String newDescription,
+            UUID newManagerId,
+            Instant newSalesStartAt,
+            Instant newSalesEndAt,
+            Instant newDrawAt,
+            Integer newMaxTickets,
+            Instant now) {
+        return new Draw(
+                id,
+                newTitle,
+                newDescription,
+                status,
+                newManagerId,
+                combinationSchemaId,
+                uiThemeId,
+                uiTemplateId,
+                newSalesStartAt,
+                newSalesEndAt,
+                newDrawAt,
+                newMaxTickets,
+                test,
+                createdAt,
+                now,
+                deletedAt,
+                version);
+    }
+
     public UUID id() {
         return id;
     }

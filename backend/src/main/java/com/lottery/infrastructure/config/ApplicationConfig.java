@@ -13,9 +13,12 @@ import com.lottery.application.port.auth.PasswordHasher;
 import com.lottery.application.usecase.audit.ListAuditLogsUseCase;
 import com.lottery.application.usecase.admin.AdminRbacUseCase;
 import com.lottery.application.usecase.draw.CreateDrawUseCase;
+import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase;
 import com.lottery.application.usecase.draw.AssignDrawManagerUseCase;
+import com.lottery.application.usecase.draw.GetDrawUseCase;
 import com.lottery.application.usecase.draw.ListDrawsUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
+import com.lottery.application.usecase.draw.UpdateDrawUseCase;
 import com.lottery.application.usecase.auth.LoginByPasswordUseCase;
 import com.lottery.application.usecase.auth.RegisterUserUseCase;
 import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
@@ -70,7 +73,7 @@ import com.lottery.presentation.rest.audit.AuditLogsServlet;
 import com.lottery.presentation.rest.auth.LoginServlet;
 import com.lottery.presentation.rest.auth.RegisterServlet;
 import com.lottery.presentation.rest.draw.CreateDrawServlet;
-import com.lottery.presentation.rest.draw.RunDrawServlet;
+import com.lottery.presentation.rest.draw.DrawItemServlet;
 import com.lottery.presentation.rest.health.HealthServlet;
 import com.lottery.presentation.rest.health.ReadyServlet;
 import com.lottery.presentation.rest.payment.CreateInvoiceServlet;
@@ -151,6 +154,27 @@ public final class ApplicationConfig {
                 authorizationPort,
                 transactionManager,
                 new DrawMapper());
+        GetDrawUseCase getDrawUseCase = new GetDrawUseCase(
+                drawRepository,
+                authorizationPort,
+                transactionManager,
+                new DrawMapper());
+        UpdateDrawUseCase updateDrawUseCase = new UpdateDrawUseCase(
+                drawRepository,
+                drawResultRepository,
+                authorizationPort,
+                transactionManager,
+                clock,
+                new DrawMapper(),
+                auditService);
+        ChangeDrawStatusUseCase changeDrawStatusUseCase = new ChangeDrawStatusUseCase(
+                drawRepository,
+                authorizationPort,
+                transactionManager,
+                new DrawStatusTransitionPolicy(),
+                clock,
+                new DrawMapper(),
+                auditService);
         JsonCombinationEngine combinationEngine = new JsonCombinationEngine(objectMapper);
         RunDrawUseCase runDrawUseCase = new RunDrawUseCase(
                 drawRepository,
@@ -263,7 +287,14 @@ public final class ApplicationConfig {
                 new ServletHolder(new CreateDrawServlet(objectMapper, errorHandler, createDrawUseCase, listDrawsUseCase, contextFactory)),
                 "/api/v1/draws");
         context.addServlet(
-                new ServletHolder(new RunDrawServlet(objectMapper, errorHandler, runDrawUseCase, contextFactory)),
+                new ServletHolder(new DrawItemServlet(
+                        objectMapper,
+                        errorHandler,
+                        getDrawUseCase,
+                        updateDrawUseCase,
+                        changeDrawStatusUseCase,
+                        runDrawUseCase,
+                        contextFactory)),
                 "/api/v1/draws/*");
         context.addServlet(
                 new ServletHolder(

@@ -140,6 +140,195 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateDrawRequest'
+  /draws/{drawId}:
+    get:
+      operationId: getDrawById
+      summary: Get draw by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateDraw
+      summary: Update draw
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDrawRequest'
+      responses:
+        '200':
+          description: Draw updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /draws/{drawId}/activate:
+    post:
+      operationId: activateDraw
+      summary: Activate draw
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /draws/{drawId}/pause:
+    post:
+      operationId: pauseDraw
+      summary: Pause draw
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /draws/{drawId}/postpone:
+    post:
+      operationId: postponeDraw
+      summary: Postpone draw
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw postponed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /draws/{drawId}/close-sales:
+    post:
+      operationId: closeDrawSales
+      summary: Close draw sales
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw sales closed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /draws/{drawId}/cancel:
+    post:
+      operationId: cancelDraw
+      summary: Cancel draw
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /draws/{drawId}/archive:
+    post:
+      operationId: archiveDraw
+      summary: Archive draw
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw archived
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Draw'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
   /draws/{drawId}/run:
     post:
       operationId: runDraw
@@ -1175,6 +1364,25 @@ components:
         test:
           type: boolean
           default: false
+    UpdateDrawRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        salesStartAt:
+          type: string
+          format: date-time
+        salesEndAt:
+          type: string
+          format: date-time
+        drawAt:
+          type: string
+          format: date-time
+        maxTickets:
+          type: integer
+          minimum: 1
     Draw:
       type: object
       required: [id, title, description, status, combinationSchemaId, salesStartAt, salesEndAt, drawAt, test, createdAt, version]

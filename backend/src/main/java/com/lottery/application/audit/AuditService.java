@@ -22,6 +22,32 @@ public final class AuditService {
     }
 
     public void record(UseCaseContext context, String action, String entityType, UUID entityId) {
+        record(context, action, entityType, entityId, null, null);
+    }
+
+    public void recordChange(
+            UseCaseContext context,
+            String action,
+            String entityType,
+            UUID entityId,
+            Object beforeSnapshot,
+            Object afterSnapshot) {
+        record(
+                context,
+                action,
+                entityType,
+                entityId,
+                AuditSnapshotJson.toJson(beforeSnapshot),
+                AuditSnapshotJson.toJson(afterSnapshot));
+    }
+
+    public void record(
+            UseCaseContext context,
+            String action,
+            String entityType,
+            UUID entityId,
+            String beforeJson,
+            String afterJson) {
         Set<String> roleCodes = context.actorRoleCodes();
         if (roleCodes.isEmpty() && context.actorUserId() != null) {
             roleCodes = rbacRepository.findRoleCodesByUserId(context.actorUserId());
@@ -36,8 +62,8 @@ public final class AuditService {
                 context.requestId(),
                 context.ipAddress(),
                 context.userAgent(),
-                null,
-                null,
+                beforeJson,
+                afterJson,
                 clock.now()));
     }
 }

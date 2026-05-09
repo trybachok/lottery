@@ -14,16 +14,28 @@ import { PermissionCodes } from '@/shared/lib/permissions/permissionCodes'
 
 const rbacStore = useAdminRbacStore()
 const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.roleCodes.includes('ADMIN'))
 const canManageRoles = computed(
-  () => authStore.roleCodes.includes('ADMIN') || hasPermission(authStore.permissions, [PermissionCodes.ROLE_MANAGE]),
+  () => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.ROLE_MANAGE]),
 )
+const canReadPermissions = computed(
+  () => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.PERMISSION_MANAGE]),
+)
+const selectedRole = computed(() => rbacStore.roles.find((role) => role.id === rbacStore.selectedRoleId) ?? null)
 
 onMounted(() => {
-  void rbacStore.loadRoles()
+  void loadPageData()
 })
 
 async function createRole(request: RoleRequest): Promise<void> {
   await rbacStore.createRole(request)
+}
+
+async function loadPageData(): Promise<void> {
+  await rbacStore.loadRoles()
+  if (canReadPermissions.value) {
+    await rbacStore.loadPermissions()
+  }
 }
 </script>
 
@@ -45,14 +57,21 @@ async function createRole(request: RoleRequest): Promise<void> {
       <AdminRolesTable
         :roles="rbacStore.roles"
         :selected-role-id="rbacStore.selectedRoleId"
+        :can-manage="canManageRoles"
+        :loading="rbacStore.isSaving"
         @select-role="rbacStore.selectRole"
+        @update-role="rbacStore.updateRole"
+        @delete-role="rbacStore.deleteRole"
       />
       <PermissionAssignmentPanel
-        v-if="canManageRoles"
+        v-if="canManageRoles && canReadPermissions"
         :selected-role-id="rbacStore.selectedRoleId"
+        :selected-role="selectedRole"
         :role-permissions="rbacStore.selectedRolePermissions"
+        :permissions="rbacStore.permissions"
         :loading="rbacStore.isSaving"
         @assign-permission="rbacStore.assignPermissionToSelectedRole"
+        @remove-permission="rbacStore.removePermissionFromSelectedRole"
       />
     </div>
   </main>

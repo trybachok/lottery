@@ -17,13 +17,22 @@ const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.roleCodes.includes('ADMIN'))
 const canCreateUser = computed(() => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.USER_CREATE]))
 const canUpdateUser = computed(() => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.USER_UPDATE]))
+const canDeleteUser = computed(() => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.USER_DELETE]))
+const canReadRoles = computed(() => isAdmin.value || hasPermission(authStore.permissions, [PermissionCodes.ROLE_READ]))
 
 onMounted(() => {
-  void rbacStore.loadUsers()
+  void loadPageData()
 })
 
 async function createUser(request: AdminUserRequestWritable): Promise<void> {
   await rbacStore.createUser(request)
+}
+
+async function loadPageData(): Promise<void> {
+  await rbacStore.loadUsers()
+  if (canReadRoles.value) {
+    await rbacStore.loadRoles()
+  }
 }
 </script>
 
@@ -45,14 +54,23 @@ async function createUser(request: AdminUserRequestWritable): Promise<void> {
       <AdminUsersTable
         :users="rbacStore.users"
         :selected-user-id="rbacStore.selectedUserId"
+        :current-user-id="authStore.user?.id"
+        :can-update="canUpdateUser"
+        :can-delete="canDeleteUser"
+        :loading="rbacStore.isSaving"
         @select-user="rbacStore.selectUser"
+        @update-user="rbacStore.updateUser"
+        @delete-user="rbacStore.deleteUser"
       />
       <RoleAssignmentPanel
-        v-if="canUpdateUser"
+        v-if="canUpdateUser && canReadRoles"
         :selected-user-id="rbacStore.selectedUserId"
         :user-roles="rbacStore.selectedUserRoles"
+        :roles="rbacStore.roles"
+        :current-user-id="authStore.user?.id"
         :loading="rbacStore.isSaving"
         @assign-role="rbacStore.assignRoleToSelectedUser"
+        @remove-role="rbacStore.removeRoleFromSelectedUser"
       />
     </div>
   </main>

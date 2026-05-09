@@ -27,6 +27,7 @@ import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
 import com.lottery.application.usecase.payment.CancelInvoiceUseCase;
 import com.lottery.application.usecase.payment.ExpireInvoiceUseCase;
 import com.lottery.application.usecase.payment.GetInvoiceUseCase;
+import com.lottery.application.usecase.payment.GetTicketInvoiceUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentOutboxUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
@@ -275,6 +276,12 @@ public final class ApplicationConfig {
                 authorizationPort,
                 transactionManager,
                 new InvoiceMapper());
+        GetTicketInvoiceUseCase getTicketInvoiceUseCase = new GetTicketInvoiceUseCase(
+                ticketRepository,
+                invoiceRepository,
+                authorizationPort,
+                transactionManager,
+                new InvoiceMapper());
         CancelInvoiceUseCase cancelInvoiceUseCase = new CancelInvoiceUseCase(
                 invoiceRepository,
                 paymentRepository,
@@ -393,6 +400,7 @@ public final class ApplicationConfig {
                         deleteTicketUseCase,
                         checkTicketResultUseCase,
                         createInvoiceForTicketUseCase,
+                        getTicketInvoiceUseCase,
                         contextFactory)),
                 "/api/v1/tickets/*");
         context.addServlet(

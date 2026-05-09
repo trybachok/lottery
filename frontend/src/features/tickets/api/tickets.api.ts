@@ -1,6 +1,10 @@
 import {
+  checkTicketResult,
   createInvoiceForTicket,
   createTicket,
+  getInvoiceById,
+  getTicketById,
+  getTicketInvoice,
   getTickets,
 } from '@/shared/api/generated/sdk.gen'
 import type {
@@ -38,6 +42,42 @@ export async function createTicketInvoice(ticketId: string, request: CreateInvoi
       ticketId,
     },
     body: request,
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function getClientTicket(ticketId: string): Promise<Ticket> {
+  const response = await getTicketById({
+    path: { ticketId },
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function getLatestTicketInvoice(ticketId: string): Promise<Invoice> {
+  const response = await getTicketInvoice({
+    path: { ticketId },
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function getInvoice(invoiceId: string): Promise<Invoice> {
+  const response = await getInvoiceById({
+    path: { invoiceId },
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function checkClientTicketResult(ticketId: string): Promise<Ticket> {
+  const response = await checkTicketResult({
+    path: { ticketId },
     throwOnError: true,
   })
 

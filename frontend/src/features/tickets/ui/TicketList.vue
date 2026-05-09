@@ -12,6 +12,7 @@ defineProps<{
 
 defineEmits<{
   createInvoice: [ticketId: string]
+  refreshInvoice: [ticketId: string]
 }>()
 
 const columns = [
@@ -20,7 +21,8 @@ const columns = [
   { key: 'combinationValues', label: 'Combination' },
   { key: 'priceAmount', label: 'Price', align: 'right' },
   { key: 'invoice', label: 'Invoice' },
-] satisfies Array<{ key: keyof Ticket | 'invoice'; label: string; align?: 'left' | 'right' | 'center' }>
+  { key: 'actions', label: 'Actions' },
+] satisfies Array<{ key: keyof Ticket | 'invoice' | 'actions'; label: string; align?: 'left' | 'right' | 'center' }>
 </script>
 
 <template>
@@ -35,30 +37,45 @@ const columns = [
       </template>
 
       <template #invoice="{ row }">
-        <a
-          v-if="invoicesByTicketId[row.id]?.paymentUrl"
-          class="ticket-list__payment-link"
-          :href="invoicesByTicketId[row.id].paymentUrl"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Payment page
-        </a>
-        <BaseButton
-          v-else
-          size="sm"
-          variant="secondary"
-          :loading="invoiceLoadingTicketId === row.id"
-          @click="$emit('createInvoice', row.id)"
-        >
-          Create invoice
-        </BaseButton>
+        <div class="ticket-list__invoice">
+          <span v-if="invoicesByTicketId[row.id]">{{ invoicesByTicketId[row.id].status }}</span>
+          <a
+            v-if="invoicesByTicketId[row.id]?.paymentUrl"
+            class="ticket-list__payment-link"
+            :href="invoicesByTicketId[row.id].paymentUrl"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Payment page
+          </a>
+          <BaseButton
+            v-else
+            size="sm"
+            variant="secondary"
+            :loading="invoiceLoadingTicketId === row.id"
+            @click="$emit('createInvoice', row.id)"
+          >
+            Create invoice
+          </BaseButton>
+        </div>
+      </template>
+
+      <template #actions="{ row }">
+        <RouterLink class="ticket-list__payment-link" :to="`/account/tickets/${row.id}`">Details</RouterLink>
       </template>
     </BaseTable>
   </BaseCard>
 </template>
 
 <style scoped>
+.ticket-list__invoice {
+  display: flex;
+  min-width: 180px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .ticket-list__payment-link {
   color: var(--color-primary);
   font-weight: 700;

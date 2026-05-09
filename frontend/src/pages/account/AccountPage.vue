@@ -1,18 +1,21 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AppErrorMessage from '@/shared/ui/AppErrorMessage.vue'
 import AppLoader from '@/shared/ui/AppLoader.vue'
 import BaseCard from '@/shared/ui/BaseCard.vue'
 import BaseButton from '@/shared/ui/BaseButton.vue'
 import { useAuthStore } from '@/features/auth/model/auth.store'
 import { useTicketsStore } from '@/features/tickets/model/tickets.store'
+import ResultHistory from '@/features/tickets/ui/ResultHistory.vue'
 import TicketCreateForm, { type TicketCreateFormValue } from '@/features/tickets/ui/TicketCreateForm.vue'
 import TicketList from '@/features/tickets/ui/TicketList.vue'
 
 const authStore = useAuthStore()
 const ticketsStore = useTicketsStore()
+const route = useRoute()
 const router = useRouter()
+const initialDrawId = computed(() => (typeof route.query.drawId === 'string' ? route.query.drawId : ''))
 
 onMounted(() => {
   void ticketsStore.loadTickets(authStore.user?.id)
@@ -28,13 +31,17 @@ async function createTicket(value: TicketCreateFormValue): Promise<void> {
     return
   }
 
-  await ticketsStore.createTicket({
+  const ticket = await ticketsStore.createTicket({
     userId: authStore.user.id,
     drawId: value.drawId,
     combinationValues: value.combinationValues,
     priceAmount: value.priceAmount,
     priceCurrency: value.priceCurrency,
   })
+
+  if (ticket) {
+    await router.push(`/account/tickets/${ticket.id}`)
+  }
 }
 </script>
 
@@ -59,6 +66,7 @@ async function createTicket(value: TicketCreateFormValue): Promise<void> {
 
     <BaseCard title="Create ticket" description="Create a ticket for an active draw.">
       <TicketCreateForm
+        :initial-draw-id="initialDrawId"
         :loading="ticketsStore.isCreating"
         :error-message="ticketsStore.actionError?.message"
         @submit="createTicket"
@@ -78,6 +86,8 @@ async function createTicket(value: TicketCreateFormValue): Promise<void> {
       :invoice-loading-ticket-id="ticketsStore.invoiceLoadingTicketId"
       @create-invoice="ticketsStore.createInvoice"
     />
+
+    <ResultHistory v-if="!ticketsStore.isLoading && !ticketsStore.error" :tickets="ticketsStore.items" />
   </main>
 </template>
 

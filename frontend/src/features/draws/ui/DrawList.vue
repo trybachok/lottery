@@ -13,7 +13,8 @@ const columns = [
   { key: 'salesEndAt', label: 'Sales end' },
   { key: 'drawAt', label: 'Draw time' },
   { key: 'maxTickets', label: 'Max tickets', align: 'right' },
-] satisfies Array<{ key: keyof Draw & string; label: string; align?: 'left' | 'right' | 'center' }>
+  { key: 'actions', label: 'Actions' },
+] satisfies Array<{ key: (keyof Draw & string) | 'actions'; label: string; align?: 'left' | 'right' | 'center' }>
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat('en', {
@@ -35,6 +36,21 @@ function formatDate(value: string): string {
       <template #maxTickets="{ value }">
         {{ value ?? '-' }}
       </template>
+      <template #actions="{ row }">
+        <RouterLink class="draw-list__link" :to="`/draws/${row.id}`">Details</RouterLink>
+      </template>
     </BaseTable>
   </BaseCard>
 </template>
+
+<style scoped>
+.draw-list__link {
+  color: var(--color-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.draw-list__link:hover {
+  text-decoration: underline;
+}
+</style>

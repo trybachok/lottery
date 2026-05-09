@@ -1,11 +1,28 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import DrawList from './DrawList.vue'
 import type { Draw } from '@/shared/api/generated/types.gen'
+
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [
+    { path: '/draws/:drawId', component: { template: '<div />' } },
+  ],
+})
 
 const meta: Meta<typeof DrawList> = {
   title: 'Features/Draws/DrawList',
   component: DrawList,
   tags: ['autodocs'],
+  decorators: [
+    (story) => ({
+      components: { Story: story() },
+      template: '<Story />',
+      beforeCreate() {
+        this.$.appContext.app.use(router)
+      },
+    }),
+  ],
 }
 
 export default meta

@@ -9,6 +9,7 @@ import com.lottery.application.dto.InvoiceDto;
 import com.lottery.application.dto.TicketDto;
 import com.lottery.application.dto.TicketListDto;
 import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
+import com.lottery.application.usecase.payment.GetTicketInvoiceUseCase;
 import com.lottery.application.usecase.ticket.BulkCreateTicketsUseCase;
 import com.lottery.application.usecase.ticket.CancelTicketUseCase;
 import com.lottery.application.usecase.ticket.CheckTicketResultUseCase;
@@ -32,6 +33,7 @@ public final class TicketItemServlet extends JsonServlet {
     private final DeleteTicketUseCase deleteTicketUseCase;
     private final CheckTicketResultUseCase checkTicketResultUseCase;
     private final CreateInvoiceForTicketUseCase createInvoiceUseCase;
+    private final GetTicketInvoiceUseCase getTicketInvoiceUseCase;
     private final ServletUseCaseContextFactory contextFactory;
 
     public TicketItemServlet(
@@ -43,6 +45,7 @@ public final class TicketItemServlet extends JsonServlet {
             DeleteTicketUseCase deleteTicketUseCase,
             CheckTicketResultUseCase checkTicketResultUseCase,
             CreateInvoiceForTicketUseCase createInvoiceUseCase,
+            GetTicketInvoiceUseCase getTicketInvoiceUseCase,
             ServletUseCaseContextFactory contextFactory) {
         super(objectMapper, errorHandler);
         this.getTicketUseCase = getTicketUseCase;
@@ -51,6 +54,7 @@ public final class TicketItemServlet extends JsonServlet {
         this.deleteTicketUseCase = deleteTicketUseCase;
         this.checkTicketResultUseCase = checkTicketResultUseCase;
         this.createInvoiceUseCase = createInvoiceUseCase;
+        this.getTicketInvoiceUseCase = getTicketInvoiceUseCase;
         this.contextFactory = contextFactory;
     }
 
@@ -58,6 +62,10 @@ public final class TicketItemServlet extends JsonServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             PathParts path = path(request);
+            if ("invoice".equals(path.action()) && path.ticketId() != null) {
+                writeJson(response, 200, getTicketInvoiceUseCase.execute(path.ticketId(), contextFactory.from(request)));
+                return;
+            }
             if (path.action() != null || path.ticketId() == null) {
                 throw new NotFoundException("Endpoint");
             }
@@ -160,4 +168,3 @@ public final class TicketItemServlet extends JsonServlet {
     private record PathParts(UUID ticketId, String action) {
     }
 }
-

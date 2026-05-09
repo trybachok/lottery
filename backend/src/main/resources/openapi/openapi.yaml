@@ -557,6 +557,26 @@ paths:
         '409':
           $ref: '#/components/responses/Error'
   /tickets/{ticketId}/invoice:
+    get:
+      operationId: getTicketInvoice
+      summary: Get latest payment invoice for ticket
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TicketIdPath'
+      responses:
+        '200':
+          description: Ticket invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
     post:
       operationId: createInvoiceForTicket
       summary: Create payment invoice for ticket

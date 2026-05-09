@@ -19,6 +19,7 @@ import com.lottery.application.usecase.payment.CancelInvoiceUseCase;
 import com.lottery.application.usecase.payment.CreateInvoiceForTicketUseCase;
 import com.lottery.application.usecase.payment.ExpireInvoiceUseCase;
 import com.lottery.application.usecase.payment.GetInvoiceUseCase;
+import com.lottery.application.usecase.payment.GetTicketInvoiceUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentOutboxUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
@@ -242,6 +243,59 @@ final class PaymentUseCaseTest {
                 () -> useCase.execute(
                         fixture.invoice.id(),
                         new UseCaseContext(UUID.randomUUID(), Set.of(PermissionCodes.PAYMENT_READ), "req_test")));
+    }
+
+    @Test
+    void getTicketInvoiceReturnsLatestInvoiceAndEnforcesOwnership() {
+        PaymentFixture fixture = new PaymentFixture(TicketStatus.PAYMENT_PENDING, InvoiceStatus.PENDING, PaymentStatus.INITIATED);
+        Invoice olderInvoice = new Invoice(
+                UUID.randomUUID(),
+                fixture.ticket.id(),
+                fixture.ticket.userId(),
+                "mock",
+                InvoiceStatus.EXPIRED,
+                fixture.ticket.price(),
+                "ext-inv-old",
+                "invoice-idem-old",
+                NOW.minusSeconds(300),
+                NOW.minusSeconds(60),
+                null);
+        fixture.invoices.save(olderInvoice);
+        GetTicketInvoiceUseCase useCase = new GetTicketInvoiceUseCase(
+                fixture.tickets,
+                fixture.invoices,
+                grantAll(),
+                directTransaction(),
+                new InvoiceMapper());
+
+        var result = useCase.execute(
+                fixture.ticket.id(),
+                new UseCaseContext(fixture.ticket.userId(), Set.of(PermissionCodes.PAYMENT_READ), "req_test"));
+
+        assertEquals(fixture.invoice.id(), result.id());
+        assertEquals(fixture.ticket.id(), result.ticketId());
+        org.junit.jupiter.api.Assertions.assertThrows(
+                ConflictException.class,
+                () -> useCase.execute(
+                        fixture.ticket.id(),
+                        new UseCaseContext(UUID.randomUUID(), Set.of(PermissionCodes.PAYMENT_READ), "req_test")));
+    }
+
+    @Test
+    void getTicketInvoiceReturnsNotFoundWhenTicketHasNoInvoice() {
+        Ticket ticket = ticket(UUID.randomUUID(), TicketStatus.CREATED);
+        GetTicketInvoiceUseCase useCase = new GetTicketInvoiceUseCase(
+                new InMemoryTicketRepository(List.of(ticket)),
+                new InMemoryInvoiceRepository(),
+                grantAll(),
+                directTransaction(),
+                new InvoiceMapper());
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+                NotFoundException.class,
+                () -> useCase.execute(
+                        ticket.id(),
+                        new UseCaseContext(ticket.userId(), Set.of(PermissionCodes.PAYMENT_READ), "req_test")));
     }
 
     @Test
@@ -607,6 +661,13 @@ final class PaymentUseCaseTest {
                     .filter(invoice -> invoice.ticketId().equals(ticketId))
                     .filter(invoice -> invoice.status() == InvoiceStatus.CREATED || invoice.status() == InvoiceStatus.PENDING)
                     .findFirst();
+        }
+
+        @Override
+        public List<Invoice> findByTicketId(UUID ticketId) {
+            return byId.values().stream()
+                    .filter(invoice -> invoice.ticketId().equals(ticketId))
+                    .toList();
         }
 
         @Override

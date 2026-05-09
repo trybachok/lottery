@@ -1,11 +1,28 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import TicketList from './TicketList.vue'
 import type { Invoice, Ticket } from '@/shared/api/generated/types.gen'
+
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [
+    { path: '/account/tickets/:ticketId', component: { template: '<div />' } },
+  ],
+})
 
 const meta: Meta<typeof TicketList> = {
   title: 'Features/Tickets/TicketList',
   component: TicketList,
   tags: ['autodocs'],
+  decorators: [
+    (story) => ({
+      components: { Story: story() },
+      template: '<Story />',
+      beforeCreate() {
+        this.$.appContext.app.use(router)
+      },
+    }),
+  ],
 }
 
 export default meta

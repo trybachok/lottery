@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import BaseButton from '@/shared/ui/BaseButton.vue'
 import BaseInput from '@/shared/ui/BaseInput.vue'
 import AppErrorMessage from '@/shared/ui/AppErrorMessage.vue'
@@ -11,14 +11,16 @@ export type TicketCreateFormValue = {
   priceCurrency: string
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     loading?: boolean
     errorMessage?: string
+    initialDrawId?: string
   }>(),
   {
     loading: false,
     errorMessage: undefined,
+    initialDrawId: '',
   },
 )
 
@@ -27,13 +29,23 @@ const emit = defineEmits<{
 }>()
 
 const form = reactive({
-  drawId: '',
+  drawId: props.initialDrawId,
   combinationValues: '',
   priceAmount: '100.00',
   priceCurrency: 'RUB',
 })
 
 const validationErrors = ref<Partial<Record<keyof typeof form, string>>>({})
+
+watch(
+  () => props.initialDrawId,
+  (drawId) => {
+    if (drawId && form.drawId !== drawId) {
+      form.drawId = drawId
+    }
+  },
+  { immediate: true },
+)
 
 function submit(): void {
   validationErrors.value = validate()

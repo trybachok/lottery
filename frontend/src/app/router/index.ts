@@ -31,8 +31,23 @@ const routes: RouteRecordRaw[] = [
         },
     },
     {
+        path: '/draws/:drawId',
+        component: () => import('@/pages/public/DrawDetailsPage.vue'),
+        meta: {
+            requiresAuth: true,
+            permissions: [PermissionCodes.DRAW_READ],
+        },
+    },
+    {
         path: '/account',
         component: () => import('@/pages/account/AccountPage.vue'),
+        meta: {
+            requiresAuth: true,
+        },
+    },
+    {
+        path: '/account/tickets/:ticketId',
+        component: () => import('@/pages/account/TicketDetailsPage.vue'),
         meta: {
             requiresAuth: true,
         },

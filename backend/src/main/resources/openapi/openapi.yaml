@@ -111,7 +111,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DrawReportResponse'
+                $ref: '#/components/schemas/DrawListResponse'
         '401':
           $ref: '#/components/responses/Error'
         '403':
@@ -411,7 +411,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TicketReportResponse'
+                $ref: '#/components/schemas/TicketListResponse'
         '401':
           $ref: '#/components/responses/Error'
         '403':
@@ -1173,6 +1173,9 @@ paths:
       summary: Admin list permissions
       security:
         - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
           description: Permissions

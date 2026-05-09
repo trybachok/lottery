@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import AppErrorMessage from '@/shared/ui/AppErrorMessage.vue'
 import AppLoader from '@/shared/ui/AppLoader.vue'
+import BaseButton from '@/shared/ui/BaseButton.vue'
 import BaseCard from '@/shared/ui/BaseCard.vue'
 import AdminDrawReportTable from '@/features/admin-reports/ui/AdminDrawReportTable.vue'
 import AdminTicketReportTable from '@/features/admin-reports/ui/AdminTicketReportTable.vue'
@@ -54,6 +55,15 @@ function exportDraws(payload: { filters: ReportFilters; format: ReportExportForm
 function exportTickets(payload: { filters: ReportFilters; format: ReportExportFormat }): void {
   void reportsStore.exportTickets(payload.filters as TicketReportFilters, payload.format)
 }
+
+function pageLabel(page: { total: number; offset: number; limit: number }): string {
+  if (page.total === 0) {
+    return '0 of 0'
+  }
+  const from = page.offset + 1
+  const to = Math.min(page.offset + page.limit, page.total)
+  return `${from}-${to} of ${page.total}`
+}
 </script>
 
 <template>
@@ -92,7 +102,28 @@ function exportTickets(payload: { filters: ReportFilters; format: ReportExportFo
       title="Could not load draw report"
       :message="reportsStore.drawError.message"
     />
-    <AdminDrawReportTable v-else-if="canUseDrawReport" :draws="reportsStore.draws" />
+    <template v-else-if="canUseDrawReport">
+      <AdminDrawReportTable :draws="reportsStore.draws" />
+      <nav class="admin-reports-page__pagination" aria-label="Draw report pagination">
+        <span>{{ pageLabel(reportsStore.drawPage) }}</span>
+        <BaseButton
+          size="sm"
+          variant="secondary"
+          :disabled="reportsStore.drawPage.offset === 0 || reportsStore.isLoadingDraws"
+          @click="reportsStore.loadPreviousDrawPage"
+        >
+          Previous
+        </BaseButton>
+        <BaseButton
+          size="sm"
+          variant="secondary"
+          :disabled="!reportsStore.drawPage.hasMore || reportsStore.isLoadingDraws"
+          @click="reportsStore.loadNextDrawPage"
+        >
+          Next
+        </BaseButton>
+      </nav>
+    </template>
 
     <BaseCard
       v-if="canUseTicketReport"
@@ -119,7 +150,28 @@ function exportTickets(payload: { filters: ReportFilters; format: ReportExportFo
       title="Could not load ticket report"
       :message="reportsStore.ticketError.message"
     />
-    <AdminTicketReportTable v-else-if="canUseTicketReport" :tickets="reportsStore.tickets" />
+    <template v-else-if="canUseTicketReport">
+      <AdminTicketReportTable :tickets="reportsStore.tickets" />
+      <nav class="admin-reports-page__pagination" aria-label="Ticket report pagination">
+        <span>{{ pageLabel(reportsStore.ticketPage) }}</span>
+        <BaseButton
+          size="sm"
+          variant="secondary"
+          :disabled="reportsStore.ticketPage.offset === 0 || reportsStore.isLoadingTickets"
+          @click="reportsStore.loadPreviousTicketPage"
+        >
+          Previous
+        </BaseButton>
+        <BaseButton
+          size="sm"
+          variant="secondary"
+          :disabled="!reportsStore.ticketPage.hasMore || reportsStore.isLoadingTickets"
+          @click="reportsStore.loadNextTicketPage"
+        >
+          Next
+        </BaseButton>
+      </nav>
+    </template>
   </main>
 </template>
 
@@ -133,5 +185,14 @@ function exportTickets(payload: { filters: ReportFilters; format: ReportExportFo
   margin: 0;
   color: var(--color-text-muted);
   font-size: 0.9375rem;
+}
+
+.admin-reports-page__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 10px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
 </style>

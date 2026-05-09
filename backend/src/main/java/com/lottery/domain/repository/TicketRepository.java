@@ -37,4 +37,8 @@ public interface TicketRepository {
         }
         return findAll(limit, offset);
     }
+
+    default long countReport(UUID userId, UUID drawId, TicketStatus status, Instant createdFrom, Instant createdTo) {
+        return findReport(userId, drawId, status, createdFrom, createdTo, Integer.MAX_VALUE, 0).size();
+    }
 }

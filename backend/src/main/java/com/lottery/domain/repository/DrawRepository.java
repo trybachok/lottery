@@ -28,4 +28,8 @@ public interface DrawRepository {
             int offset) {
         return findAll(limit, offset);
     }
+
+    default long countReport(UUID drawId, UUID managerId, DrawStatus status, Instant createdFrom, Instant createdTo) {
+        return findReport(drawId, managerId, status, createdFrom, createdTo, Integer.MAX_VALUE, 0).size();
+    }
 }

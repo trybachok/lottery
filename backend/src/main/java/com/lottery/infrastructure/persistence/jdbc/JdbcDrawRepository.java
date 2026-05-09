@@ -190,12 +190,80 @@ public final class JdbcDrawRepository implements DrawRepository {
             Instant createdTo,
             int limit,
             int offset) {
-        StringBuilder sql = new StringBuilder("""
+        ReportSql reportSql = reportSql(
+                """
                 select id, title, description, status, manager_id, combination_schema_id, ui_theme_id, ui_template_id,
                        sales_start_at, sales_end_at, draw_at, max_tickets, is_test, created_at, updated_at, deleted_at, version
                 from draws
                 where deleted_at is null
-                """);
+                """,
+                drawId,
+                managerId,
+                status,
+                createdFrom,
+                createdTo);
+        StringBuilder sql = reportSql.sql();
+        sql.append(" order by created_at desc limit ? offset ?");
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
+                int index = 1;
+                for (SqlParameter parameter : reportSql.parameters()) {
+                    parameter.bind(statement, index++);
+                }
+                statement.setInt(index++, limit);
+                statement.setInt(index, offset);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<Draw> draws = new ArrayList<>();
+                    while (resultSet.next()) {
+                        draws.add(map(resultSet));
+                    }
+                    return draws;
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to build draw report", exception);
+        }
+    }
+
+    @Override
+    public long countReport(UUID drawId, UUID managerId, DrawStatus status, Instant createdFrom, Instant createdTo) {
+        ReportSql reportSql = reportSql(
+                """
+                select count(*)
+                from draws
+                where deleted_at is null
+                """,
+                drawId,
+                managerId,
+                status,
+                createdFrom,
+                createdTo);
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(reportSql.sql().toString())) {
+                int index = 1;
+                for (SqlParameter parameter : reportSql.parameters()) {
+                    parameter.bind(statement, index++);
+                }
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    resultSet.next();
+                    return resultSet.getLong(1);
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to count draw report", exception);
+        }
+    }
+
+    private ReportSql reportSql(
+            String baseSql,
+            UUID drawId,
+            UUID managerId,
+            DrawStatus status,
+            Instant createdFrom,
+            Instant createdTo) {
+        StringBuilder sql = new StringBuilder(baseSql);
         List<SqlParameter> parameters = new ArrayList<>();
         if (drawId != null) {
             sql.append(" and id = ?");
@@ -217,27 +285,7 @@ public final class JdbcDrawRepository implements DrawRepository {
             sql.append(" and created_at <= ?");
             parameters.add((statement, index) -> JdbcSupport.setInstant(statement, index, createdTo));
         }
-        sql.append(" order by created_at desc limit ? offset ?");
-        try {
-            Connection connection = connectionProvider.currentConnection();
-            try (PreparedStatement statement = connection.prepareStatement(sql.toString())) {
-                int index = 1;
-                for (SqlParameter parameter : parameters) {
-                    parameter.bind(statement, index++);
-                }
-                statement.setInt(index++, limit);
-                statement.setInt(index, offset);
-                try (ResultSet resultSet = statement.executeQuery()) {
-                    List<Draw> draws = new ArrayList<>();
-                    while (resultSet.next()) {
-                        draws.add(map(resultSet));
-                    }
-                    return draws;
-                }
-            }
-        } catch (SQLException exception) {
-            throw new IllegalStateException("Failed to build draw report", exception);
-        }
+        return new ReportSql(sql, parameters);
     }
 
     private Draw map(ResultSet resultSet) throws SQLException {
@@ -266,5 +314,8 @@ public final class JdbcDrawRepository implements DrawRepository {
     @FunctionalInterface
     private interface SqlParameter {
         void bind(PreparedStatement statement, int index) throws SQLException;
+    }
+
+    private record ReportSql(StringBuilder sql, List<SqlParameter> parameters) {
     }
 }

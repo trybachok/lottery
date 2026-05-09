@@ -219,12 +219,68 @@ public final class JdbcTicketRepository implements TicketRepository {
             Instant createdTo,
             int limit,
             int offset) {
-        StringBuilder sql = new StringBuilder("""
+        ReportSql reportSql = reportSql(
+                """
                 select id, user_id, draw_id, status, combination_json, price_amount, price_currency, match_percent,
                        prize_id, is_test, created_at, paid_at, participated_at, checked_at, cancelled_at, deleted_at, version
                 from tickets
                 where deleted_at is null
-                """);
+                """,
+                userId,
+                drawId,
+                status,
+                createdFrom,
+                createdTo);
+        StringBuilder sql = reportSql.sql();
+        sql.append(" order by created_at desc limit ? offset ?");
+        return findMany(sql.toString(), statement -> {
+            int index = 1;
+            for (SqlParameter parameter : reportSql.parameters()) {
+                parameter.bind(statement, index++);
+            }
+            statement.setInt(index++, limit);
+            statement.setInt(index, offset);
+        });
+    }
+
+    @Override
+    public long countReport(UUID userId, UUID drawId, TicketStatus status, Instant createdFrom, Instant createdTo) {
+        ReportSql reportSql = reportSql(
+                """
+                select count(*)
+                from tickets
+                where deleted_at is null
+                """,
+                userId,
+                drawId,
+                status,
+                createdFrom,
+                createdTo);
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(reportSql.sql().toString())) {
+                int index = 1;
+                for (SqlParameter parameter : reportSql.parameters()) {
+                    parameter.bind(statement, index++);
+                }
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    resultSet.next();
+                    return resultSet.getLong(1);
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to count ticket report", exception);
+        }
+    }
+
+    private ReportSql reportSql(
+            String baseSql,
+            UUID userId,
+            UUID drawId,
+            TicketStatus status,
+            Instant createdFrom,
+            Instant createdTo) {
+        StringBuilder sql = new StringBuilder(baseSql);
         List<SqlParameter> parameters = new ArrayList<>();
         if (userId != null) {
             sql.append(" and user_id = ?");
@@ -246,15 +302,7 @@ public final class JdbcTicketRepository implements TicketRepository {
             sql.append(" and created_at <= ?");
             parameters.add((statement, index) -> JdbcSupport.setInstant(statement, index, createdTo));
         }
-        sql.append(" order by created_at desc limit ? offset ?");
-        return findMany(sql.toString(), statement -> {
-            int index = 1;
-            for (SqlParameter parameter : parameters) {
-                parameter.bind(statement, index++);
-            }
-            statement.setInt(index++, limit);
-            statement.setInt(index, offset);
-        });
+        return new ReportSql(sql, parameters);
     }
 
     private List<Ticket> findMany(String sql, StatementBinder binder) {
@@ -309,5 +357,8 @@ public final class JdbcTicketRepository implements TicketRepository {
     @FunctionalInterface
     private interface SqlParameter {
         void bind(PreparedStatement statement, int index) throws SQLException;
+    }
+
+    private record ReportSql(StringBuilder sql, List<SqlParameter> parameters) {
     }
 }

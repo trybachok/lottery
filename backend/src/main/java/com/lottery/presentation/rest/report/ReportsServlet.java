@@ -2,6 +2,7 @@ package com.lottery.presentation.rest.report;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.dto.DrawDto;
+import com.lottery.application.dto.ReportPageDto;
 import com.lottery.application.dto.TicketDto;
 import com.lottery.application.query.DrawReportQuery;
 import com.lottery.application.query.TicketReportQuery;
@@ -41,13 +42,13 @@ public final class ReportsServlet extends JsonServlet {
         try {
             String path = request.getPathInfo();
             if ("/draws".equals(path) || "/draws/export".equals(path)) {
-                List<DrawDto> items = drawReportUseCase.execute(drawQuery(request), contextFactory.from(request));
-                writeDrawResponse(request, response, items);
+                ReportPageDto<DrawDto> page = drawReportUseCase.execute(drawQuery(request), contextFactory.from(request));
+                writeDrawResponse(request, response, page, "/draws/export".equals(path));
                 return;
             }
             if ("/tickets".equals(path) || "/tickets/export".equals(path)) {
-                List<TicketDto> items = ticketReportUseCase.execute(ticketQuery(request), contextFactory.from(request));
-                writeTicketResponse(request, response, items);
+                ReportPageDto<TicketDto> page = ticketReportUseCase.execute(ticketQuery(request), contextFactory.from(request));
+                writeTicketResponse(request, response, page, "/tickets/export".equals(path));
                 return;
             }
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
@@ -78,24 +79,42 @@ public final class ReportsServlet extends JsonServlet {
                 intQuery(request, "offset", 0));
     }
 
-    private void writeDrawResponse(HttpServletRequest request, HttpServletResponse response, List<DrawDto> items) throws IOException {
-        if ("csv".equalsIgnoreCase(request.getParameter("format"))) {
+    private void writeDrawResponse(HttpServletRequest request, HttpServletResponse response, ReportPageDto<DrawDto> page, boolean export)
+            throws IOException {
+        if (export && "csv".equalsIgnoreCase(request.getParameter("format"))) {
             response.setStatus(200);
-            response.setContentType("text/csv");
-            response.getWriter().write(drawCsv(items));
+            response.setContentType("text/csv; charset=utf-8");
+            if (export) {
+                response.setHeader("Content-Disposition", "attachment; filename=\"draw-report.csv\"");
+            }
+            response.getWriter().write(drawCsv(page.items()));
             return;
         }
-        writeJson(response, 200, new DrawReportResponse(items));
+        if (export) {
+            response.setHeader("Content-Disposition", "attachment; filename=\"draw-report.json\"");
+        }
+        writeJson(response, 200, new DrawReportResponse(page.items(), page.total(), page.limit(), page.offset(), page.hasMore()));
     }
 
-    private void writeTicketResponse(HttpServletRequest request, HttpServletResponse response, List<TicketDto> items) throws IOException {
-        if ("csv".equalsIgnoreCase(request.getParameter("format"))) {
+    private void writeTicketResponse(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            ReportPageDto<TicketDto> page,
+            boolean export)
+            throws IOException {
+        if (export && "csv".equalsIgnoreCase(request.getParameter("format"))) {
             response.setStatus(200);
-            response.setContentType("text/csv");
-            response.getWriter().write(ticketCsv(items));
+            response.setContentType("text/csv; charset=utf-8");
+            if (export) {
+                response.setHeader("Content-Disposition", "attachment; filename=\"ticket-report.csv\"");
+            }
+            response.getWriter().write(ticketCsv(page.items()));
             return;
         }
-        writeJson(response, 200, new TicketReportResponse(items));
+        if (export) {
+            response.setHeader("Content-Disposition", "attachment; filename=\"ticket-report.json\"");
+        }
+        writeJson(response, 200, new TicketReportResponse(page.items(), page.total(), page.limit(), page.offset(), page.hasMore()));
     }
 
     private String drawCsv(List<DrawDto> items) {
@@ -185,13 +204,13 @@ public final class ReportsServlet extends JsonServlet {
         return value == null || value.isBlank() ? defaultValue : Integer.parseInt(value);
     }
 
-    public record DrawReportResponse(List<DrawDto> items) {
+    public record DrawReportResponse(List<DrawDto> items, long total, int limit, int offset, boolean hasMore) {
         public DrawReportResponse {
             items = List.copyOf(items);
         }
     }
 
-    public record TicketReportResponse(List<TicketDto> items) {
+    public record TicketReportResponse(List<TicketDto> items, long total, int limit, int offset, boolean hasMore) {
         public TicketReportResponse {
             items = List.copyOf(items);
         }

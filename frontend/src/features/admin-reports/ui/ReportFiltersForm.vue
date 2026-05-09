@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import BaseButton from '@/shared/ui/BaseButton.vue'
 import BaseInput from '@/shared/ui/BaseInput.vue'
 import BaseSelect from '@/shared/ui/BaseSelect.vue'
@@ -33,16 +33,23 @@ const form = reactive({
   status: '',
   dateFrom: '',
   dateTo: '',
+  limit: '50',
 })
+const validationErrors = ref<Partial<Record<keyof typeof form, string>>>({})
 
 const drawStatusOptions = [
   { label: 'Any status', value: '' },
   { label: 'Draft', value: 'DRAFT' },
   { label: 'Scheduled', value: 'SCHEDULED' },
   { label: 'Active', value: 'ACTIVE' },
+  { label: 'Paused', value: 'PAUSED' },
+  { label: 'Postponed', value: 'POSTPONED' },
   { label: 'Sales closed', value: 'SALES_CLOSED' },
+  { label: 'Drawing', value: 'DRAWING' },
   { label: 'Completed', value: 'COMPLETED' },
   { label: 'Cancelled', value: 'CANCELLED' },
+  { label: 'Test', value: 'TEST' },
+  { label: 'Archived', value: 'ARCHIVED' },
 ]
 
 const ticketStatusOptions = [
@@ -50,17 +57,35 @@ const ticketStatusOptions = [
   { label: 'Created', value: 'CREATED' },
   { label: 'Payment pending', value: 'PAYMENT_PENDING' },
   { label: 'Paid', value: 'PAID' },
+  { label: 'Payment failed', value: 'PAYMENT_FAILED' },
+  { label: 'Refund pending', value: 'REFUND_PENDING' },
+  { label: 'Refunded', value: 'REFUNDED' },
+  { label: 'Cancelled', value: 'CANCELLED' },
   { label: 'Participated', value: 'PARTICIPATED' },
+  { label: 'Not participated', value: 'NOT_PARTICIPATED' },
+  { label: 'Checked', value: 'CHECKED' },
   { label: 'Win', value: 'WIN' },
   { label: 'Lose', value: 'LOSE' },
-  { label: 'Cancelled', value: 'CANCELLED' },
+  { label: 'Deleted', value: 'DELETED' },
+  { label: 'Test', value: 'TEST' },
+]
+
+const limitOptions = [
+  { label: '25 rows', value: '25' },
+  { label: '50 rows', value: '50' },
+  { label: '100 rows', value: '100' },
+  { label: '250 rows', value: '250' },
 ]
 
 function submitFilters(): void {
+  validationErrors.value = validate()
+  if (Object.keys(validationErrors.value).length > 0) return
   emit('submit', buildFilters())
 }
 
 function exportFilters(format: ReportExportFormat): void {
+  validationErrors.value = validate()
+  if (Object.keys(validationErrors.value).length > 0) return
   emit('export', {
     filters: buildFilters(),
     format,
@@ -69,7 +94,7 @@ function exportFilters(format: ReportExportFormat): void {
 
 function buildFilters(): ReportFilters {
   const commonFilters: Omit<DrawReportFilters & TicketReportFilters, 'status'> = {
-    limit: 50,
+    limit: Number(form.limit),
     offset: 0,
   }
 
@@ -102,6 +127,14 @@ function buildFilters(): ReportFilters {
   } satisfies TicketReportFilters
 }
 
+function validate(): Partial<Record<keyof typeof form, string>> {
+  const errors: Partial<Record<keyof typeof form, string>> = {}
+  if (form.dateFrom && form.dateTo && form.dateFrom > form.dateTo) {
+    errors.dateTo = 'Date to must not be before date from.'
+  }
+  return errors
+}
+
 function toStartOfDayIso(date: string): string {
   return new Date(`${date}T00:00:00.000Z`).toISOString()
 }
@@ -120,8 +153,9 @@ function toEndOfDayIso(date: string): string {
       label="Status"
       :options="kind === 'draws' ? drawStatusOptions : ticketStatusOptions"
     />
-    <BaseInput v-model="form.dateFrom" type="date" label="Date from" />
-    <BaseInput v-model="form.dateTo" type="date" label="Date to" />
+    <BaseInput v-model="form.dateFrom" type="date" label="Date from" :error="validationErrors.dateFrom" />
+    <BaseInput v-model="form.dateTo" type="date" label="Date to" :error="validationErrors.dateTo" />
+    <BaseSelect v-model="form.limit" label="Page size" :options="limitOptions" />
 
     <div class="report-filters-form__actions">
       <BaseButton type="submit" :loading="loading">Apply</BaseButton>

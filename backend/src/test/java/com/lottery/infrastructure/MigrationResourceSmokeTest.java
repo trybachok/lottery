@@ -59,6 +59,18 @@ final class MigrationResourceSmokeTest {
         assertTrue(migration.contains("payment_url"), "invoice payment URL persistence is required");
     }
 
+    @Test
+    void reportIndexMigrationContainsReadQueryIndexes() throws IOException {
+        String migration = resource("/db/migration/V4__report_query_indexes.sql");
+
+        assertTrue(migration.contains("idx_draws_report_status_created_at"), "draw status report index is required");
+        assertTrue(migration.contains("idx_draws_report_manager_created_at"), "draw manager report index is required");
+        assertTrue(migration.contains("idx_tickets_report_user_created_at"), "ticket user report index is required");
+        assertTrue(migration.contains("idx_tickets_report_draw_created_at"), "ticket draw report index is required");
+        assertTrue(migration.contains("idx_tickets_report_status_created_at"), "ticket status report index is required");
+        assertTrue(migration.contains("where deleted_at is null"), "report indexes must target active rows");
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing migration resource: " + path);

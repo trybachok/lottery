@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { registerRouterGuards } from './guards'
-import { PermissionCodes, UserAdminPermissions } from '@/shared/lib/permissions/permissionCodes'
+import { AdminPanelPermissions, PermissionCodes } from '@/shared/lib/permissions/permissionCodes'
 
 const routes: RouteRecordRaw[] = [
     {
@@ -65,22 +65,7 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/pages/admin/ui/AdminShell.vue'),
         meta: {
             requiresAuth: true,
-            permissions: [
-                ...UserAdminPermissions,
-                PermissionCodes.ROLE_READ,
-                PermissionCodes.ROLE_MANAGE,
-                PermissionCodes.PERMISSION_MANAGE,
-                PermissionCodes.DRAW_READ,
-                PermissionCodes.DRAW_CREATE,
-                PermissionCodes.DRAW_UPDATE,
-                PermissionCodes.DRAW_RUN,
-                PermissionCodes.REPORT_DRAW_EXPORT,
-                PermissionCodes.REPORT_TICKET_EXPORT,
-                PermissionCodes.AUDIT_READ,
-                PermissionCodes.UI_THEME_MANAGE,
-                PermissionCodes.UI_TEMPLATE_MANAGE,
-                PermissionCodes.SYSTEM_SETTINGS_MANAGE,
-            ],
+            permissions: [...AdminPanelPermissions],
             permissionMode: 'any',
         },
         children: [

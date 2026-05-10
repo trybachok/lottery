@@ -1,5 +1,5 @@
 import { hasPermission } from '@/shared/lib/permissions/hasPermission'
-import { PermissionCodes, UserAdminPermissions } from '@/shared/lib/permissions/permissionCodes'
+import { AdminPanelPermissions, PermissionCodes } from '@/shared/lib/permissions/permissionCodes'
 
 export type AdminNavigationItem = {
   label: string
@@ -12,15 +12,7 @@ export const adminNavigationItems: AdminNavigationItem[] = [
   {
     label: 'Dashboard',
     to: '/admin',
-    permissions: [
-      ...UserAdminPermissions,
-      PermissionCodes.DRAW_READ,
-      PermissionCodes.REPORT_DRAW_EXPORT,
-      PermissionCodes.AUDIT_READ,
-      PermissionCodes.SYSTEM_SETTINGS_MANAGE,
-      PermissionCodes.UI_THEME_MANAGE,
-      PermissionCodes.UI_TEMPLATE_MANAGE,
-    ],
+    permissions: [...AdminPanelPermissions],
     permissionMode: 'any',
   },
   {

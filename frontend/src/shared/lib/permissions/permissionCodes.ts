@@ -33,3 +33,21 @@ export const UserAdminPermissions = [
   PermissionCodes.USER_UPDATE,
   PermissionCodes.USER_DELETE,
 ] as const
+
+export const AdminPanelPermissions = [
+  ...UserAdminPermissions,
+  PermissionCodes.ROLE_READ,
+  PermissionCodes.ROLE_MANAGE,
+  PermissionCodes.PERMISSION_MANAGE,
+  PermissionCodes.DRAW_CREATE,
+  PermissionCodes.DRAW_UPDATE,
+  PermissionCodes.DRAW_CANCEL,
+  PermissionCodes.DRAW_RUN,
+  PermissionCodes.PAYMENT_REFUND,
+  PermissionCodes.REPORT_DRAW_EXPORT,
+  PermissionCodes.REPORT_TICKET_EXPORT,
+  PermissionCodes.UI_THEME_MANAGE,
+  PermissionCodes.UI_TEMPLATE_MANAGE,
+  PermissionCodes.AUDIT_READ,
+  PermissionCodes.SYSTEM_SETTINGS_MANAGE,
+] as const

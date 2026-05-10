@@ -9,11 +9,9 @@ const forbiddenPath = '/forbidden'
 export function registerRouterGuards(router: Router): void {
   router.beforeEach((to) => {
     const authStore = useAuthStore()
-    const requiresAuth = Boolean(to.meta.requiresAuth)
-    const publicOnly = Boolean(to.meta.publicOnly)
-    const adminOnly = Boolean(to.meta.adminOnly)
-    const permissions = to.meta.permissions
-    const permissionMode = to.meta.permissionMode ?? 'all'
+    const routeMetaChain = to.matched.map((route) => route.meta)
+    const requiresAuth = routeMetaChain.some((meta) => Boolean(meta.requiresAuth))
+    const publicOnly = routeMetaChain.some((meta) => Boolean(meta.publicOnly))
 
     if (publicOnly && authStore.isAuthenticated) {
       return defaultAuthenticatedPath
@@ -32,7 +30,9 @@ export function registerRouterGuards(router: Router): void {
       }
     }
 
-    if (adminOnly && !authStore.roleCodes.includes('ADMIN')) {
+    const hasAdminRole = authStore.roleCodes.includes('ADMIN')
+
+    if (routeMetaChain.some((meta) => Boolean(meta.adminOnly)) && !hasAdminRole) {
       return {
         path: forbiddenPath,
         query: {
@@ -41,10 +41,7 @@ export function registerRouterGuards(router: Router): void {
       }
     }
 
-    if (
-      !authStore.roleCodes.includes('ADMIN') &&
-      !hasPermission(authStore.permissions, permissions, permissionMode)
-    ) {
+    if (!hasAdminRole && !hasRequiredRoutePermissions(routeMetaChain, authStore.permissions)) {
       return {
         path: forbiddenPath,
         query: {
@@ -55,6 +52,15 @@ export function registerRouterGuards(router: Router): void {
 
     return true
   })
+}
+
+function hasRequiredRoutePermissions(
+  routeMetaChain: Array<{ permissions?: string[]; permissionMode?: PermissionMode }>,
+  userPermissions: string[],
+): boolean {
+  return routeMetaChain.every((meta) =>
+    hasPermission(userPermissions, meta.permissions, meta.permissionMode ?? 'all'),
+  )
 }
 
 declare module 'vue-router' {

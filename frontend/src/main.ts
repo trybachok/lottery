@@ -4,6 +4,7 @@ import './style.css'
 import App from './App.vue'
 import { configureApiClient } from '@/shared/api/configureApiClient'
 import { useAuthStore } from '@/features/auth/model/auth.store'
+import { useThemeStore } from '@/features/theme/model/theme.store'
 import router from './app/router'
 
 const app = createApp(App)
@@ -15,5 +16,6 @@ app.use(pinia)
 app.use(router)
 
 useAuthStore().restoreSession()
+useThemeStore().restoreSelection()
 
 app.mount('#app')

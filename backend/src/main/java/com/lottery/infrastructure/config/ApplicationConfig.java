@@ -8,6 +8,7 @@ import com.lottery.application.mapper.DrawResultMapper;
 import com.lottery.application.mapper.InvoiceMapper;
 import com.lottery.application.mapper.PaymentMapper;
 import com.lottery.application.mapper.TicketMapper;
+import com.lottery.application.mapper.UiMapper;
 import com.lottery.application.mapper.UserMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.auth.PasswordHasher;
@@ -34,6 +35,8 @@ import com.lottery.application.usecase.payment.RefundPaymentUseCase;
 import com.lottery.application.usecase.report.GenerateDrawReportUseCase;
 import com.lottery.application.usecase.report.GenerateTicketReportUseCase;
 import com.lottery.application.usecase.system.GetOpenApiDocumentUseCase;
+import com.lottery.application.usecase.system.AdminUiUseCase;
+import com.lottery.application.usecase.system.GetHomePageUseCase;
 import com.lottery.application.usecase.ticket.BulkCreateTicketsUseCase;
 import com.lottery.application.usecase.ticket.CancelTicketUseCase;
 import com.lottery.application.usecase.ticket.CheckTicketResultUseCase;
@@ -55,7 +58,10 @@ import com.lottery.domain.repository.PaymentRepository;
 import com.lottery.domain.repository.PaymentOutboxRepository;
 import com.lottery.domain.repository.PaymentWebhookEventRepository;
 import com.lottery.domain.repository.RbacRepository;
+import com.lottery.domain.repository.SystemSettingsRepository;
 import com.lottery.domain.repository.TicketRepository;
+import com.lottery.domain.repository.UiTemplateRepository;
+import com.lottery.domain.repository.UiThemeRepository;
 import com.lottery.domain.repository.UserRepository;
 import com.lottery.domain.repository.WinningRuleRepository;
 import com.lottery.domain.service.DomainClock;
@@ -72,8 +78,11 @@ import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentOutboxRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentWebhookEventRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcRbacRepository;
+import com.lottery.infrastructure.persistence.jdbc.JdbcSystemSettingsRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTicketRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTransactionManager;
+import com.lottery.infrastructure.persistence.jdbc.JdbcUiTemplateRepository;
+import com.lottery.infrastructure.persistence.jdbc.JdbcUiThemeRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcUserRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcWinningRuleRepository;
 import com.lottery.infrastructure.security.BcryptPasswordHasher;
@@ -86,6 +95,9 @@ import com.lottery.presentation.rest.OpenApiServlet;
 import com.lottery.presentation.rest.ServletUseCaseContextFactory;
 import com.lottery.presentation.rest.admin.AdminPermissionsServlet;
 import com.lottery.presentation.rest.admin.AdminRolesServlet;
+import com.lottery.presentation.rest.admin.AdminSettingsServlet;
+import com.lottery.presentation.rest.admin.AdminUiTemplatesServlet;
+import com.lottery.presentation.rest.admin.AdminUiThemesServlet;
 import com.lottery.presentation.rest.admin.AdminUsersServlet;
 import com.lottery.presentation.rest.admin.AssignDrawManagerServlet;
 import com.lottery.presentation.rest.audit.AuditLogsServlet;
@@ -100,6 +112,7 @@ import com.lottery.presentation.rest.payment.InvoiceItemServlet;
 import com.lottery.presentation.rest.payment.PaymentWebhookServlet;
 import com.lottery.presentation.rest.payment.RefundPaymentServlet;
 import com.lottery.presentation.rest.report.ReportsServlet;
+import com.lottery.presentation.rest.system.HomePageServlet;
 import com.lottery.presentation.rest.ticket.CreateTicketServlet;
 import com.lottery.presentation.rest.ticket.TicketItemServlet;
 import com.lottery.presentation.rest.user.CreateUserServlet;
@@ -135,6 +148,9 @@ public final class ApplicationConfig {
         PaymentWebhookEventRepository paymentWebhookEventRepository = new JdbcPaymentWebhookEventRepository(transactionManager);
         RbacRepository rbacRepository = new JdbcRbacRepository(transactionManager);
         AuditLogRepository auditLogRepository = new JdbcAuditLogRepository(transactionManager);
+        UiThemeRepository uiThemeRepository = new JdbcUiThemeRepository(transactionManager, objectMapper);
+        UiTemplateRepository uiTemplateRepository = new JdbcUiTemplateRepository(transactionManager, objectMapper);
+        SystemSettingsRepository systemSettingsRepository = new JdbcSystemSettingsRepository(transactionManager, objectMapper);
 
         AuthorizationPort authorizationPort = new DatabaseAuthorizationAdapter(rbacRepository);
         AuditService auditService = new AuditService(auditLogRepository, rbacRepository, clock);
@@ -361,6 +377,22 @@ public final class ApplicationConfig {
                 new OpenApiResource(),
                 authorizationPort,
                 transactionManager);
+        UiMapper uiMapper = new UiMapper();
+        GetHomePageUseCase getHomePageUseCase = new GetHomePageUseCase(
+                uiTemplateRepository,
+                uiThemeRepository,
+                systemSettingsRepository,
+                transactionManager,
+                uiMapper);
+        AdminUiUseCase adminUiUseCase = new AdminUiUseCase(
+                uiThemeRepository,
+                uiTemplateRepository,
+                systemSettingsRepository,
+                authorizationPort,
+                transactionManager,
+                clock,
+                uiMapper,
+                auditService);
 
         ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService, rbacRepository);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
@@ -382,6 +414,9 @@ public final class ApplicationConfig {
         context.addServlet(
                 new ServletHolder(new LoginServlet(objectMapper, errorHandler, loginByPasswordUseCase)),
                 "/api/v1/auth/login");
+        context.addServlet(
+                new ServletHolder(new HomePageServlet(objectMapper, errorHandler, getHomePageUseCase)),
+                "/api/v1/home-page");
         context.addServlet(
                 new ServletHolder(new CreateUserServlet(objectMapper, errorHandler, createUserUseCase, contextFactory)),
                 "/api/v1/users");
@@ -451,6 +486,15 @@ public final class ApplicationConfig {
         context.addServlet(
                 new ServletHolder(new AdminPermissionsServlet(objectMapper, errorHandler, adminRbacUseCase, contextFactory)),
                 "/api/v1/admin/permissions/*");
+        context.addServlet(
+                new ServletHolder(new AdminUiThemesServlet(objectMapper, errorHandler, adminUiUseCase, contextFactory)),
+                "/api/v1/admin/ui-themes/*");
+        context.addServlet(
+                new ServletHolder(new AdminUiTemplatesServlet(objectMapper, errorHandler, adminUiUseCase, contextFactory)),
+                "/api/v1/admin/ui-templates/*");
+        context.addServlet(
+                new ServletHolder(new AdminSettingsServlet(objectMapper, errorHandler, adminUiUseCase, contextFactory)),
+                "/api/v1/admin/settings/*");
         context.addServlet(
                 new ServletHolder(new AssignDrawManagerServlet(objectMapper, errorHandler, assignDrawManagerUseCase, contextFactory)),
                 "/api/v1/admin/draws/*");

@@ -11,6 +11,8 @@ tags:
     description: Registration and password login.
   - name: Users
     description: Public user creation APIs.
+  - name: Home Page
+    description: Client-facing home page layout and theme configuration.
   - name: Draws
     description: Draw lifecycle, execution and result APIs.
   - name: Tickets
@@ -27,6 +29,12 @@ tags:
     description: Administrative roles, permissions and assignments.
   - name: Admin Draws
     description: Administrative draw ownership actions.
+  - name: Admin Settings
+    description: Administrative system settings.
+  - name: Admin UI Themes
+    description: Administrative UI theme management.
+  - name: Admin UI Templates
+    description: Administrative home page template management.
 paths:
   /openapi.yaml:
     get:
@@ -90,6 +98,20 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/LoginRequest'
+  /home-page:
+    get:
+      tags: [Home Page]
+      operationId: getHomePage
+      summary: Get client home page configuration
+      responses:
+        '200':
+          description: Home page template and available themes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomePage'
+        '404':
+          $ref: '#/components/responses/Error'
   /users:
     post:
       tags: [Users]
@@ -1331,6 +1353,235 @@ paths:
       responses:
         '204':
           description: Permission deleted
+  /admin/ui-themes:
+    get:
+      tags: [Admin UI Themes]
+      operationId: adminListUiThemes
+      summary: Admin list UI themes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: UI themes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiThemeListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Admin UI Themes]
+      operationId: adminCreateUiTheme
+      summary: Admin create UI theme
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiThemeRequest'
+      responses:
+        '201':
+          description: UI theme created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTheme'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin/ui-themes/{themeId}:
+    get:
+      tags: [Admin UI Themes]
+      operationId: adminGetUiTheme
+      summary: Admin get UI theme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ThemeIdPath'
+      responses:
+        '200':
+          description: UI theme
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTheme'
+        '404':
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [Admin UI Themes]
+      operationId: adminUpdateUiTheme
+      summary: Admin update UI theme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ThemeIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiThemeRequest'
+      responses:
+        '200':
+          description: UI theme updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTheme'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /admin/ui-themes/{themeId}/default:
+    post:
+      tags: [Admin UI Themes]
+      operationId: adminSetDefaultUiTheme
+      summary: Admin set default UI theme
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ThemeIdPath'
+      responses:
+        '200':
+          description: Default UI theme updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTheme'
+        '404':
+          $ref: '#/components/responses/Error'
+  /admin/ui-templates:
+    get:
+      tags: [Admin UI Templates]
+      operationId: adminListUiTemplates
+      summary: Admin list UI templates
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: UI templates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTemplateListResponse'
+    post:
+      tags: [Admin UI Templates]
+      operationId: adminCreateUiTemplate
+      summary: Admin create UI template
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiTemplateRequest'
+      responses:
+        '201':
+          description: UI template created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTemplate'
+        '400':
+          $ref: '#/components/responses/Error'
+  /admin/ui-templates/{templateId}:
+    get:
+      tags: [Admin UI Templates]
+      operationId: adminGetUiTemplate
+      summary: Admin get UI template
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TemplateIdPath'
+      responses:
+        '200':
+          description: UI template
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTemplate'
+        '404':
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [Admin UI Templates]
+      operationId: adminUpdateUiTemplate
+      summary: Admin update UI template
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TemplateIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UiTemplateRequest'
+      responses:
+        '200':
+          description: UI template updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UiTemplate'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /admin/settings/home-page:
+    get:
+      tags: [Admin Settings]
+      operationId: adminGetHomePageSettings
+      summary: Admin get home page settings
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Home page settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomePageSettings'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [Admin Settings]
+      operationId: adminUpdateHomePageSettings
+      summary: Admin update home page settings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HomePageSettingsRequest'
+      responses:
+        '200':
+          description: Home page settings updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HomePageSettings'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
   /admin/draws/{drawId}/assign-manager:
     post:
       tags: [Admin Draws]
@@ -1382,6 +1633,20 @@ components:
         format: uuid
     PermissionIdPath:
       name: permissionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ThemeIdPath:
+      name: themeId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TemplateIdPath:
+      name: templateId
       in: path
       required: true
       schema:
@@ -1493,6 +1758,114 @@ components:
               additionalProperties: true
             requestId:
               type: string
+    JsonObject:
+      type: object
+      additionalProperties: true
+    UiTheme:
+      type: object
+      required: [id, name, tokens, defaultTheme, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        tokens:
+          $ref: '#/components/schemas/JsonObject'
+        defaultTheme:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    UiThemeRequest:
+      type: object
+      required: [name, tokens]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        tokens:
+          $ref: '#/components/schemas/JsonObject'
+        defaultTheme:
+          type: boolean
+          default: false
+    UiThemeListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UiTheme'
+    UiTemplate:
+      type: object
+      required: [id, name, layout, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        layout:
+          $ref: '#/components/schemas/JsonObject'
+        createdAt:
+          type: string
+          format: date-time
+    UiTemplateRequest:
+      type: object
+      required: [name, layout]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        layout:
+          $ref: '#/components/schemas/JsonObject'
+    UiTemplateListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UiTemplate'
+    HomePage:
+      type: object
+      required: [template, defaultTheme, themes]
+      properties:
+        template:
+          $ref: '#/components/schemas/UiTemplate'
+        defaultTheme:
+          $ref: '#/components/schemas/UiTheme'
+        themes:
+          type: array
+          items:
+            $ref: '#/components/schemas/UiTheme'
+    HomePageSettings:
+      type: object
+      required: [activeTemplateId, defaultThemeId, updatedAt]
+      properties:
+        activeTemplateId:
+          type: string
+          format: uuid
+        defaultThemeId:
+          type: string
+          format: uuid
+        updatedBy:
+          type: string
+          format: uuid
+        updatedAt:
+          type: string
+          format: date-time
+    HomePageSettingsRequest:
+      type: object
+      required: [activeTemplateId, defaultThemeId]
+      properties:
+        activeTemplateId:
+          type: string
+          format: uuid
+        defaultThemeId:
+          type: string
+          format: uuid
     CreateUserRequest:
       type: object
       required: [email, login]

@@ -17,6 +17,9 @@ export const adminNavigationItems: AdminNavigationItem[] = [
       PermissionCodes.DRAW_READ,
       PermissionCodes.REPORT_DRAW_EXPORT,
       PermissionCodes.AUDIT_READ,
+      PermissionCodes.SYSTEM_SETTINGS_MANAGE,
+      PermissionCodes.UI_THEME_MANAGE,
+      PermissionCodes.UI_TEMPLATE_MANAGE,
     ],
     permissionMode: 'any',
   },
@@ -50,6 +53,21 @@ export const adminNavigationItems: AdminNavigationItem[] = [
     label: 'Audit',
     to: '/admin/audit-logs',
     permissions: [PermissionCodes.AUDIT_READ],
+  },
+  {
+    label: 'Settings',
+    to: '/admin/settings',
+    permissions: [PermissionCodes.SYSTEM_SETTINGS_MANAGE],
+  },
+  {
+    label: 'UI Themes',
+    to: '/admin/ui-themes',
+    permissions: [PermissionCodes.UI_THEME_MANAGE],
+  },
+  {
+    label: 'UI Templates',
+    to: '/admin/ui-templates',
+    permissions: [PermissionCodes.UI_TEMPLATE_MANAGE],
   },
 ]
 

@@ -77,6 +77,9 @@ const routes: RouteRecordRaw[] = [
                 PermissionCodes.REPORT_DRAW_EXPORT,
                 PermissionCodes.REPORT_TICKET_EXPORT,
                 PermissionCodes.AUDIT_READ,
+                PermissionCodes.UI_THEME_MANAGE,
+                PermissionCodes.UI_TEMPLATE_MANAGE,
+                PermissionCodes.SYSTEM_SETTINGS_MANAGE,
             ],
             permissionMode: 'any',
         },
@@ -126,6 +129,27 @@ const routes: RouteRecordRaw[] = [
                 component: () => import('@/pages/admin/sections/AdminAuditLogsPage.vue'),
                 meta: {
                     permissions: [PermissionCodes.AUDIT_READ],
+                },
+            },
+            {
+                path: 'settings',
+                component: () => import('@/pages/admin/sections/AdminSettingsPage.vue'),
+                meta: {
+                    permissions: [PermissionCodes.SYSTEM_SETTINGS_MANAGE],
+                },
+            },
+            {
+                path: 'ui-themes',
+                component: () => import('@/pages/admin/sections/AdminUiThemesPage.vue'),
+                meta: {
+                    permissions: [PermissionCodes.UI_THEME_MANAGE],
+                },
+            },
+            {
+                path: 'ui-templates',
+                component: () => import('@/pages/admin/sections/AdminUiTemplatesPage.vue'),
+                meta: {
+                    permissions: [PermissionCodes.UI_TEMPLATE_MANAGE],
                 },
             },
         ],

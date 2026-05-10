@@ -1,12 +1,7 @@
-# syntax=docker/dockerfile:1.7
-
 FROM maven:3.9.11-eclipse-temurin-25-alpine AS build
 WORKDIR /workspace
 
 COPY backend/pom.xml backend/pom.xml
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn -f backend/pom.xml -DskipTests dependency:go-offline
-
 COPY backend/src backend/src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn -f backend/pom.xml -DskipTests package

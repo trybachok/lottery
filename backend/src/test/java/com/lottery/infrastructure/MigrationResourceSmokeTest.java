@@ -71,6 +71,17 @@ final class MigrationResourceSmokeTest {
         assertTrue(migration.contains("where deleted_at is null"), "report indexes must target active rows");
     }
 
+    @Test
+    void ownerAdminRepairMigrationBootstrapsAdminWhenMissing() throws IOException {
+        String migration = resource("/db/migration/V6__repair_owner_admin_bootstrap.sql");
+
+        assertTrue(migration.contains("u.login = 'owner'"), "owner login must be targeted");
+        assertTrue(migration.contains("r.code = 'admin'"), "ADMIN role must be assigned");
+        assertTrue(migration.contains("not exists"), "migration must not create a second admin bootstrap");
+        assertTrue(migration.contains("admin_user.deleted_at is null"), "deleted admins must not block repair");
+        assertTrue(migration.contains("on conflict do nothing"), "migration must be idempotent");
+    }
+
     private String resource(String path) throws IOException {
         try (InputStream inputStream = getClass().getResourceAsStream(path)) {
             assertNotNull(inputStream, "Missing migration resource: " + path);

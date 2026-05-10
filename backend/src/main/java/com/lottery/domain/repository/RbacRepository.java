@@ -14,6 +14,10 @@ public interface RbacRepository {
 
     void assignRoleByCode(UUID userId, String roleCode);
 
+    default boolean existsUserWithRoleCode(String roleCode) {
+        throw new UnsupportedOperationException("existsUserWithRoleCode is not implemented");
+    }
+
     default List<Role> findAllRoles(int limit, int offset) {
         throw new UnsupportedOperationException("findAllRoles is not implemented");
     }

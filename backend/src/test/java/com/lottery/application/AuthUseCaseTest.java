@@ -64,7 +64,7 @@ final class AuthUseCaseTest {
     }
 
     @Test
-    void ownerRegistrationAfterExistingUserCreatesClient() {
+    void firstOwnerRegistrationAfterExistingClientCreatesAdmin() {
         InMemoryUserRepository users = new InMemoryUserRepository();
         InMemoryRbacRepository rbac = new InMemoryRbacRepository();
         RegisterUserUseCase useCase = new RegisterUserUseCase(
@@ -74,9 +74,28 @@ final class AuthUseCaseTest {
                 directTransaction(),
                 fixedClock(),
                 new UserMapper());
-        useCase.execute(new RegisterUserCommand("client@example.com", "client", "secret"));
+        var client = useCase.execute(new RegisterUserCommand("client@example.com", "client", "secret"));
 
         var result = useCase.execute(new RegisterUserCommand("owner@example.com", "owner", "secret"));
+
+        assertEquals(Set.of(RoleCodes.CLIENT), rbac.roles.get(client.id()));
+        assertEquals(Set.of(RoleCodes.ADMIN), rbac.roles.get(result.id()));
+    }
+
+    @Test
+    void registrationAfterExistingAdminCreatesClient() {
+        InMemoryUserRepository users = new InMemoryUserRepository();
+        InMemoryRbacRepository rbac = new InMemoryRbacRepository();
+        RegisterUserUseCase useCase = new RegisterUserUseCase(
+                users,
+                rbac,
+                passwordHasher(),
+                directTransaction(),
+                fixedClock(),
+                new UserMapper());
+        useCase.execute(new RegisterUserCommand("admin@example.com", "owner", "secret"));
+
+        var result = useCase.execute(new RegisterUserCommand("second-owner@example.com", "second-owner", "secret"));
 
         assertEquals(Set.of(RoleCodes.CLIENT), rbac.roles.get(result.id()));
     }
@@ -209,6 +228,11 @@ final class AuthUseCaseTest {
         @Override
         public void assignRoleByCode(UUID userId, String roleCode) {
             roles.computeIfAbsent(userId, ignored -> new HashSet<>()).add(roleCode);
+        }
+
+        @Override
+        public boolean existsUserWithRoleCode(String roleCode) {
+            return roles.values().stream().anyMatch(userRoles -> userRoles.contains(roleCode));
         }
     }
 }

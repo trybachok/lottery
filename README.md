@@ -4,7 +4,7 @@ Lottery System - это fullstack-приложение для управлени
 Система включает клиентскую часть, административную панель, backend API, PostgreSQL и 
 Docker-инфраструктуру для локального запуска.
 
-## Что Реализовано
+## Что реализовано
 
 Основные возможности системы:
 
@@ -64,7 +64,7 @@ Infrastructure:
 - healthchecks
 - JSON-file log rotation для контейнеров
 
-## Структура Проекта
+## Структура проекта
 
 ```text
 .
@@ -168,9 +168,9 @@ password: *****
 Важно: автоматическое назначение `ADMIN` работает только для самого первого пользователя 
 в пустой базе и только при логине `owner`. Все остальные регистрации получают роль `CLIENT`.
 
-## Как Пользоваться Системой
+## Как пользоваться системой
 
-### Главная Страница И Темы
+### Главная страница и темы
 
 Откройте `/`.
 
@@ -187,7 +187,7 @@ password: *****
 - темы: `/admin/ui-themes`;
 - шаблоны Home page: `/admin/ui-templates`.
 
-### Регистрация И Вход
+### Регистрация и вход
 
 Клиентский пользователь:
 
@@ -218,7 +218,7 @@ http://127.0.0.1:8090/admin
 - `UI Themes` - управление темами;
 - `UI Templates` - управление шаблонами.
 
-### API Документация
+### API документация
 
 Swagger UI доступен по адресу:
 
@@ -326,7 +326,7 @@ curl http://127.0.0.1:8090/health
 curl http://127.0.0.1:8090/api/v1/home-page
 ```
 
-## Переменные Окружения
+## Переменные окружения
 
 Для локального Docker-запуска используется `.env.example`.
 
@@ -349,7 +349,7 @@ curl http://127.0.0.1:8090/api/v1/home-page
 Для production нельзя использовать `CHANGE_ME` значения из `.env.example`. 
 Создайте отдельный `.env` на сервере и заполните реальные секреты.
 
-## Текущие Особенности И Ограничения
+## Текущие особенности и ограничения
 
 - Первый admin пользователь не seed-ится миграциями: зарегистрируйте первым пользователя с логином `owner`, и backend автоматически назначит ему роль `ADMIN`.
 - UI для combination schemas, prizes и winning rules еще не выделен в отдельные админ-разделы; для полного сценария розыгрыша эти данные можно добавить через SQL или API/DB tooling.
@@ -1319,3 +1319,2056 @@ curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
 ```text
 PAID
 ```
+---
+Ниже инструкция для **Сценария 2. Лотерея с оплатой**.
+
+Повторяющиеся этапы из сценария 1 я не дублирую полностью, а указываю, какой шаг нужно выполнить.
+
+# Сценарий 2. Лотерея с оплатой
+
+Цель сценария:
+
+```text
+создание тиража
+→ создание билета
+→ создание invoice
+→ mock-оплата
+→ webhook успешной оплаты
+→ привязка оплаты к билету
+→ webhook неуспешной оплаты
+→ завершение тиража
+→ проверка результата оплаченного билета
+```
+
+---
+
+## 0. Что должно быть подготовлено ранее (во время проверки сценаря 1)
+
+Этот этап уже описан в **Сценарии 1**, поэтому не дублируется.
+
+Нужно выполнить:
+
+```text
+Сценарий 1, шаги 1–7:
+1. Запустить проект.
+2. Создать администратора.
+3. Создать клиента.
+4. Подготовить combination_schema.
+5. Создать тираж.
+6. Активировать тираж.
+7. Добавить приз и winning_rule.
+```
+
+После этих шагов должны быть переменные:
+
+```bash
+export BASE="http://127.0.0.1:8090/api/v1"
+export ADMIN_TOKEN="<admin_token>"
+export CLIENT_TOKEN="<client_token>"
+export CLIENT_USER_ID="<client_user_id>"
+export DRAW_ID="<draw_id>"
+```
+
+Тираж должен быть в статусе:
+
+```text
+ACTIVE
+```
+
+Проверить можно так:
+
+```bash
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/draws/$DRAW_ID" | jq '{id, title, status, salesStartAt, salesEndAt}'
+```
+
+---
+
+# Часть 1. Создание билетов
+
+Создание билета уже было описано в **Сценарии 1, шаг 9**, но для сценария оплаты создадим два билета:
+
+```text
+TICKET_SUCCESS_ID — билет с успешной оплатой
+TICKET_FAILED_ID  — билет с неуспешной оплатой
+```
+
+## 1.1. Создать билет для успешной оплаты
+
+```bash
+TICKET_SUCCESS_RESPONSE=$(curl -s -X POST "$BASE/tickets" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -d "{
+    \"userId\": \"$CLIENT_USER_ID\",
+    \"drawId\": \"$DRAW_ID\",
+    \"combinationValues\": [\"7\", \"1\"],
+    \"priceAmount\": \"100.00\",
+    \"priceCurrency\": \"RUB\",
+    \"test\": false
+  }")
+
+echo "$TICKET_SUCCESS_RESPONSE" | jq
+
+export TICKET_SUCCESS_ID=$(echo "$TICKET_SUCCESS_RESPONSE" | jq -r '.id')
+echo "$TICKET_SUCCESS_ID"
+```
+
+Ожидаемый статус билета:
+
+```text
+CREATED
+```
+
+---
+
+## 1.2. Создать билет для неуспешной оплаты
+
+```bash
+TICKET_FAILED_RESPONSE=$(curl -s -X POST "$BASE/tickets" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -d "{
+    \"userId\": \"$CLIENT_USER_ID\",
+    \"drawId\": \"$DRAW_ID\",
+    \"combinationValues\": [\"7\", \"2\"],
+    \"priceAmount\": \"100.00\",
+    \"priceCurrency\": \"RUB\",
+    \"test\": false
+  }")
+
+echo "$TICKET_FAILED_RESPONSE" | jq
+
+export TICKET_FAILED_ID=$(echo "$TICKET_FAILED_RESPONSE" | jq -r '.id')
+echo "$TICKET_FAILED_ID"
+```
+
+Ожидаемый статус билета:
+
+```text
+CREATED
+```
+
+---
+
+# Часть 2. Создание invoice для оплаты
+
+В текущем проекте оплата работает через сущности:
+
+```text
+ticket
+  ↓
+invoice
+  ↓
+payment
+  ↓
+mock payment webhook
+```
+
+То есть успешная оплата не отправляется напрямую в билет. 
+Она приходит через webhook по `externalInvoiceId`, backend находит invoice, 
+по invoice находит ticket и меняет статус билета.
+
+---
+
+## 2.1. Создать invoice для билета с успешной оплатой
+
+```bash
+INVOICE_SUCCESS_RESPONSE=$(curl -s -X POST "$BASE/tickets/$TICKET_SUCCESS_ID/invoice" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -d "{
+    \"providerCode\": \"mock\",
+    \"idempotencyKey\": \"invoice-success-$TICKET_SUCCESS_ID-$(date +%s)\"
+  }")
+
+echo "$INVOICE_SUCCESS_RESPONSE" | jq
+
+export INVOICE_SUCCESS_ID=$(echo "$INVOICE_SUCCESS_RESPONSE" | jq -r '.id')
+echo "$INVOICE_SUCCESS_ID"
+```
+
+После создания invoice билет должен перейти в статус:
+
+```text
+PAYMENT_PENDING
+```
+
+Проверить билет:
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_SUCCESS_ID" | jq '{id, status, priceAmount, priceCurrency}'
+```
+
+---
+
+## 2.2. Создать invoice для билета с неуспешной оплатой
+
+```bash
+INVOICE_FAILED_RESPONSE=$(curl -s -X POST "$BASE/tickets/$TICKET_FAILED_ID/invoice" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -d "{
+    \"providerCode\": \"mock\",
+    \"idempotencyKey\": \"invoice-failed-$TICKET_FAILED_ID-$(date +%s)\"
+  }")
+
+echo "$INVOICE_FAILED_RESPONSE" | jq
+
+export INVOICE_FAILED_ID=$(echo "$INVOICE_FAILED_RESPONSE" | jq -r '.id')
+echo "$INVOICE_FAILED_ID"
+```
+
+После создания invoice второй билет тоже должен стать:
+
+```text
+PAYMENT_PENDING
+```
+
+---
+
+# Часть 3. Дождаться mock invoice от payment provider
+
+После создания invoice backend кладёт задачу в payment outbox. Worker должен обратиться к mock provider и заполнить:
+
+```text
+externalInvoiceId
+externalPaymentId
+paymentUrl
+```
+
+Подождать:
+
+```bash
+sleep 12
+```
+
+Получить invoice для успешной оплаты:
+
+```bash
+INVOICE_SUCCESS_CURRENT=$(curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_SUCCESS_ID/invoice")
+
+echo "$INVOICE_SUCCESS_CURRENT" | jq
+
+export EXTERNAL_INVOICE_SUCCESS_ID=$(echo "$INVOICE_SUCCESS_CURRENT" | jq -r '.externalInvoiceId')
+echo "$EXTERNAL_INVOICE_SUCCESS_ID"
+```
+
+Получить invoice для неуспешной оплаты:
+
+```bash
+INVOICE_FAILED_CURRENT=$(curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_FAILED_ID/invoice")
+
+echo "$INVOICE_FAILED_CURRENT" | jq
+
+export EXTERNAL_INVOICE_FAILED_ID=$(echo "$INVOICE_FAILED_CURRENT" | jq -r '.externalInvoiceId')
+echo "$EXTERNAL_INVOICE_FAILED_ID"
+```
+
+Ожидаемо у invoice должны появиться поля:
+
+```text
+externalInvoiceId
+paymentUrl
+```
+
+Пример:
+
+```json
+{
+  "status": "PENDING",
+  "externalInvoiceId": "mock_inv_...",
+  "paymentUrl": "https://mock-payments.local/invoices/mock_inv_..."
+}
+```
+
+---
+
+# Часть 4. Подготовить функцию для mock webhook
+
+Mock provider требует HMAC SHA-256 подпись в заголовке:
+
+```text
+X-Mock-Signature
+```
+
+Секрет берём из `.env.example`:
+
+```bash
+export WEBHOOK_SECRET=$(grep '^LOTTERY_MOCK_PAYMENT_WEBHOOK_SECRET=' .env.example | cut -d= -f2-)
+echo "$WEBHOOK_SECRET"
+```
+
+Создадим универсальную функцию для отправки webhook:
+
+```bash
+send_mock_payment_webhook() {
+  local external_invoice_id="$1"
+  local event_type="$2"
+  local event_id="evt-${event_type}-${external_invoice_id}-$(date +%s)-$RANDOM"
+
+  local payload="{\"eventId\":\"${event_id}\",\"eventType\":\"${event_type}\",\"externalInvoiceId\":\"${external_invoice_id}\"}"
+
+  local signature
+  signature=$(printf '%s' "$payload" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $NF}')
+
+  curl -s -X POST "$BASE/payment-providers/mock/webhook" \
+    -H "Content-Type: application/json" \
+    -H "X-Mock-Signature: $signature" \
+    -d "$payload" | jq
+}
+```
+
+Эта функция будет использоваться для событий:
+
+```text
+PAYMENT_SUCCEEDED
+PAYMENT_FAILED
+```
+
+---
+
+# Часть 5. Обработка успешной оплаты
+
+## 5.1. Отправить webhook успешной оплаты
+
+```bash
+send_mock_payment_webhook "$EXTERNAL_INVOICE_SUCCESS_ID" "PAYMENT_SUCCEEDED"
+```
+
+Ожидаемый ответ:
+
+```json
+{
+  "processed": true,
+  "duplicate": false,
+  "status": "PAYMENT_SUCCEEDED"
+}
+```
+
+---
+
+## 5.2. Проверить, что успешная оплата привязалась к билету
+
+После успешного webhook backend должен обновить связанные сущности:
+
+```text
+invoice.status = PAID
+payment.status = CAPTURED
+ticket.status = PAID
+```
+
+Проверить билет:
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_SUCCESS_ID" | jq '{
+    id,
+    drawId,
+    status,
+    combinationValues,
+    priceAmount,
+    priceCurrency
+  }'
+```
+
+Ожидаемый статус:
+
+```text
+PAID
+```
+
+Проверить invoice:
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_SUCCESS_ID/invoice" | jq '{
+    id,
+    ticketId,
+    providerCode,
+    status,
+    externalInvoiceId,
+    paymentUrl,
+    paidAt
+  }'
+```
+
+Ожидаемый статус invoice:
+
+```text
+PAID
+```
+
+---
+
+# Часть 6. Обработка неуспешной оплаты
+
+## 6.1. Отправить webhook неуспешной оплаты
+
+```bash
+send_mock_payment_webhook "$EXTERNAL_INVOICE_FAILED_ID" "PAYMENT_FAILED"
+```
+
+Ожидаемый ответ:
+
+```json
+{
+  "processed": true,
+  "duplicate": false,
+  "status": "PAYMENT_FAILED"
+}
+```
+
+---
+
+## 6.2. Проверить статус билета после неуспешной оплаты
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_FAILED_ID" | jq '{
+    id,
+    drawId,
+    status,
+    combinationValues,
+    priceAmount,
+    priceCurrency
+  }'
+```
+
+Ожидаемый статус билета:
+
+```text
+PAYMENT_FAILED
+```
+
+Проверить invoice:
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_FAILED_ID/invoice" | jq '{
+    id,
+    ticketId,
+    providerCode,
+    status,
+    externalInvoiceId,
+    paymentUrl,
+    paidAt
+  }'
+```
+
+Ожидаемый статус invoice:
+
+```text
+FAILED
+```
+
+---
+
+# Часть 7. Что происходит с билетом после неуспешной оплаты
+
+Билет со статусом:
+
+```text
+PAYMENT_FAILED
+```
+
+не участвует в розыгрыше.
+
+В розыгрыш попадают только билеты, у которых:
+
+```text
+ticket.status = PAID
+invoice.status = PAID
+payment.status = CAPTURED
+```
+
+Поэтому после завершения тиража:
+
+```text
+TICKET_SUCCESS_ID участвует в розыгрыше
+TICKET_FAILED_ID не участвует в розыгрыше
+```
+
+---
+
+# Часть 8. Повторная попытка оплаты после неуспешной оплаты
+
+Этот шаг нужен, если нужно проверить, что после `PAYMENT_FAILED` билет можно оплатить повторно.
+
+Backend разрешает создать новый invoice для билета в статусе:
+
+```text
+CREATED
+PAYMENT_FAILED
+```
+
+Создать новый invoice для ранее неуспешного билета:
+
+```bash
+INVOICE_RETRY_RESPONSE=$(curl -s -X POST "$BASE/tickets/$TICKET_FAILED_ID/invoice" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -d "{
+    \"providerCode\": \"mock\",
+    \"idempotencyKey\": \"invoice-retry-$TICKET_FAILED_ID-$(date +%s)\"
+  }")
+
+echo "$INVOICE_RETRY_RESPONSE" | jq
+
+export INVOICE_RETRY_ID=$(echo "$INVOICE_RETRY_RESPONSE" | jq -r '.id')
+echo "$INVOICE_RETRY_ID"
+```
+
+Подождать, пока outbox создаст mock invoice:
+
+```bash
+sleep 12
+```
+
+Получить новый invoice:
+
+```bash
+INVOICE_RETRY_CURRENT=$(curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_FAILED_ID/invoice")
+
+echo "$INVOICE_RETRY_CURRENT" | jq
+
+export EXTERNAL_INVOICE_RETRY_ID=$(echo "$INVOICE_RETRY_CURRENT" | jq -r '.externalInvoiceId')
+echo "$EXTERNAL_INVOICE_RETRY_ID"
+```
+
+Теперь отправить успешную оплату по повторному invoice:
+
+```bash
+send_mock_payment_webhook "$EXTERNAL_INVOICE_RETRY_ID" "PAYMENT_SUCCEEDED"
+```
+
+Проверить билет:
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_FAILED_ID" | jq '{
+    id,
+    status,
+    combinationValues
+  }'
+```
+
+Ожидаемый статус:
+
+```text
+PAID
+```
+
+После этого билет тоже будет участвовать в розыгрыше.
+
+---
+
+# Часть 9. Закрыть продажи
+
+Этот этап уже описан в **Сценарии 1, шаг 13**, поэтому не дублируется подробно.
+
+Выполнить:
+
+```bash
+curl -s -X POST "$BASE/draws/$DRAW_ID/close-sales" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+```
+
+Проверить:
+
+```bash
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/draws/$DRAW_ID" | jq '{id, title, status}'
+```
+
+Ожидаемый статус тиража:
+
+```text
+SALES_CLOSED
+```
+
+---
+
+# Часть 10. Запустить розыгрыш
+
+Этот этап уже описан в **Сценарии 1, шаг 14**, поэтому не дублируется подробно.
+
+Выполнить:
+
+```bash
+RUN_RESPONSE=$(curl -s -X POST "$BASE/draws/$DRAW_ID/run" \
+  -H "Authorization: Bearer $ADMIN_TOKEN")
+
+echo "$RUN_RESPONSE" | jq
+```
+
+В ответе будет:
+
+```json
+{
+  "drawId": "...",
+  "drawResultId": "...",
+  "winningCombinationValues": ["7", "1"],
+  "processedTickets": 1,
+  "winningTickets": 1,
+  "losingTickets": 0,
+  "completedAt": "..."
+}
+```
+
+Количество `processedTickets` зависит от того, сколько билетов было успешно оплачено.
+
+Если не делана повторная оплата для `TICKET_FAILED_ID`, то участвует только один билет:
+
+```text
+TICKET_SUCCESS_ID
+```
+
+Если сделана повторная оплата из части 8, участвуют оба билета:
+
+```text
+TICKET_SUCCESS_ID
+TICKET_FAILED_ID
+```
+
+---
+
+# Часть 11. Проверить результат оплаченного билета
+
+Этот этап уже частично описан в **Сценарии 1, шаги 15–17**, 
+но для сценария оплаты важно разделить оплаченный и неоплаченный билет.
+
+## 11.1. Проверить результат успешно оплаченного билета
+
+```bash
+curl -s -X POST "$BASE/tickets/$TICKET_SUCCESS_ID/check" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" | jq
+```
+
+Ожидаемый результат:
+
+```text
+WIN
+```
+
+или:
+
+```text
+LOSE
+```
+
+Пример ответа:
+
+```json
+{
+  "id": "...",
+  "status": "WIN",
+  "combinationValues": ["7", "1"],
+  "matchPercent": 100.00,
+  "prizeId": "..."
+}
+```
+
+---
+
+## 11.2. Проверить результат билета с неуспешной оплатой
+
+Если **не делана повторная успешная оплата** из части 8, то этот билет остался:
+
+```text
+PAYMENT_FAILED
+```
+
+Попробовать проверить результат:
+
+```bash
+curl -s -X POST "$BASE/tickets/$TICKET_FAILED_ID/check" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" | jq
+```
+
+Ожидаемо backend не должен вернуть `WIN` или `LOSE`, потому что билет не участвовал в розыгрыше.
+
+Вероятная ошибка:
+
+```text
+TICKET_RESULT_NOT_READY
+Ticket has not been checked in draw yet
+```
+
+Это корректное поведение.
+
+---
+
+# Часть 12. Финальная проверка статусов билетов
+
+Получить список билетов клиента:
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets?userId=$CLIENT_USER_ID&limit=50&offset=0" \
+  | jq '.items[] | select(.drawId == env.DRAW_ID) | {
+      id,
+      status,
+      combinationValues,
+      matchPercent,
+      prizeId,
+      participatedAt,
+      checkedAt
+    }'
+```
+
+## Вариант A. Без повторной оплаты failed-билета
+
+Ожидаемо:
+
+```text
+TICKET_SUCCESS_ID → WIN или LOSE
+TICKET_FAILED_ID  → PAYMENT_FAILED
+```
+
+## Вариант B. С повторной успешной оплатой failed-билета
+
+Ожидаемо:
+
+```text
+TICKET_SUCCESS_ID → WIN или LOSE
+TICKET_FAILED_ID  → WIN или LOSE
+```
+
+---
+
+# Краткая схема payment lifecycle
+
+## Успешная оплата
+
+```text
+ticket.CREATED
+  ↓ create invoice
+ticket.PAYMENT_PENDING
+
+invoice.CREATED
+payment.INITIATED
+
+  ↓ payment outbox worker
+
+invoice.PENDING
+payment.INITIATED
+externalInvoiceId появляется
+
+  ↓ webhook PAYMENT_SUCCEEDED
+
+invoice.PAID
+payment.CAPTURED
+ticket.PAID
+
+  ↓ run draw
+
+ticket.WIN / ticket.LOSE
+```
+
+---
+
+## Неуспешная оплата
+
+```text
+ticket.CREATED
+  ↓ create invoice
+ticket.PAYMENT_PENDING
+
+invoice.CREATED
+payment.INITIATED
+
+  ↓ payment outbox worker
+
+invoice.PENDING
+externalInvoiceId появляется
+
+  ↓ webhook PAYMENT_FAILED
+
+invoice.FAILED
+payment.FAILED
+ticket.PAYMENT_FAILED
+```
+
+Такой билет не участвует в розыгрыше, пока по нему не будет создан новый invoice и не придёт успешный `PAYMENT_SUCCEEDED`.
+
+---
+
+# Важные ошибки в сценарии оплаты
+
+## `Ticket already has an active invoice`
+
+Причина: у билета уже есть активный invoice в статусе:
+
+```text
+CREATED
+PENDING
+```
+
+Нельзя создать новый invoice, пока текущий активен.
+
+---
+
+## `Ticket is not available for invoice creation`
+
+Причина: invoice можно создать только для билета в статусе:
+
+```text
+CREATED
+PAYMENT_FAILED
+```
+
+Нельзя создать invoice для билета в статусе:
+
+```text
+PAID
+WIN
+LOSE
+CANCELLED
+REFUNDED
+```
+
+---
+
+## `SIGNATURE_INVALID`
+
+Причина: неверная HMAC-подпись mock webhook.
+
+Проверить:
+
+```bash
+echo "$WEBHOOK_SECRET"
+```
+
+И убедиться, что подпись считается строго по тому же JSON payload, который отправляется в `curl`.
+
+---
+
+## `Invoice not found`
+
+Причина: webhook отправлен с неправильным `externalInvoiceId`.
+
+Нужно использовать именно:
+
+```bash
+echo "$EXTERNAL_INVOICE_SUCCESS_ID"
+```
+
+или:
+
+```bash
+echo "$EXTERNAL_INVOICE_FAILED_ID"
+```
+
+А не внутренний `invoice.id`.
+
+---
+
+## Билет не попал в розыгрыш
+
+Проверить, что перед запуском draw билет был:
+
+```text
+ticket.status = PAID
+```
+
+Проверить:
+
+```bash
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_SUCCESS_ID" | jq '{id, status}'
+```
+
+Для участия в розыгрыше одного статуса билета недостаточно: backend также проверяет, что связанная оплата подтверждена provider’ом:
+
+```text
+invoice.status = PAID
+payment.status = CAPTURED
+```
+
+Ниже инструкция для **Сценария 3. Лотерея с историей и аналитикой**.
+
+Повторяющиеся этапы из сценариев 1–2 я не дублирую полностью, а указываю, где они уже были описаны.
+
+# Сценарий 3. Лотерея с историей и аналитикой
+
+Цель сценария:
+
+```text id="2i38h6"
+→ создание тиража
+→ создание билета
+→ определение результата
+→ просмотр истории завершённых тиражей
+→ просмотр истории билетов пользователя
+→ получение простого отчёта по тиражам или билетам в JSON/CSV
+```
+
+---
+
+## 0. Предварительные условия
+
+Этот этап уже описан в **Сценарии 1, шаги 1–7**, поэтому не дублируется.
+
+Нужно подготовить:
+
+```text id="8lh0c6"
+1. Запущенный проект.
+2. Admin-пользователь.
+3. Client-пользователь.
+4. Combination schema.
+5. Приз.
+6. Winning rule.
+7. Активный тираж.
+```
+
+Также должны быть переменные:
+
+```bash id="398vkr"
+export BASE="http://127.0.0.1:8090/api/v1"
+export ADMIN_TOKEN="<admin_token>"
+export CLIENT_TOKEN="<client_token>"
+export CLIENT_USER_ID="<client_user_id>"
+export DRAW_ID="<draw_id>"
+```
+
+Проверить текущий тираж:
+
+```bash id="uv4lu5"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/draws/$DRAW_ID" | jq '{
+    id,
+    title,
+    status,
+    salesStartAt,
+    salesEndAt,
+    drawAt
+  }'
+```
+
+Для продолжения статус должен быть:
+
+```text id="f9h25q"
+ACTIVE
+```
+
+---
+
+# Часть 1. Создание тиража
+
+## Через curl
+
+Создание тиража уже описано в **Сценарии 1, шаг 5**, поэтому здесь не дублируется полный текст.
+
+Кратко endpoint такой:
+
+```text id="guzbq7"
+POST /api/v1/draws
+```
+
+После создания обычный тираж получает статус:
+
+```text id="dxwb7o"
+DRAFT
+```
+
+Затем его нужно активировать:
+
+```text id="evcj5x"
+POST /api/v1/draws/{drawId}/activate
+```
+
+---
+
+## Через пользовательский интерфейс
+
+Открыть админку:
+
+```text id="35a8ka"
+http://127.0.0.1:8090/admin/draws
+```
+
+Далее:
+
+```text id="9dm6qi"
+1. Нажать форму создания тиража.
+2. Заполнить title, description, combinationSchemaId, salesStartAt, salesEndAt, drawAt, maxTickets.
+3. Создать тираж.
+```
+
+Важно: через UI тираж создаётся, но в текущей версии интерфейса нет отдельной кнопки `Activate`. 
+Поэтому перевод из `DRAFT` в `ACTIVE` нужно выполнить через curl:
+
+```bash id="q3jo4e"
+curl -s -X POST "$BASE/draws/$DRAW_ID/activate" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+```
+
+---
+
+# Часть 2. Создание билета
+
+Этот этап уже описан в **Сценарии 1, шаг 9**, поэтому не дублируется.
+
+## Через curl
+
+```bash id="r1i5e9"
+TICKET_RESPONSE=$(curl -s -X POST "$BASE/tickets" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -d "{
+    \"userId\": \"$CLIENT_USER_ID\",
+    \"drawId\": \"$DRAW_ID\",
+    \"combinationValues\": [\"7\", \"1\"],
+    \"priceAmount\": \"100.00\",
+    \"priceCurrency\": \"RUB\",
+    \"test\": false
+  }")
+
+echo "$TICKET_RESPONSE" | jq
+
+export TICKET_ID=$(echo "$TICKET_RESPONSE" | jq -r '.id')
+echo "$TICKET_ID"
+```
+
+Ожидаемый статус после создания:
+
+```text id="9x9sij"
+CREATED
+```
+
+---
+
+## Через пользовательский интерфейс
+
+Открыть список тиражей:
+
+```text id="7z9p0i"
+http://127.0.0.1:8090/draws
+```
+
+Далее:
+
+```text id="b85kd6"
+1. Открыть активный тираж.
+2. Нажать Create ticket.
+3. Заполнить комбинацию.
+4. Создать билет.
+```
+
+Также можно открыть аккаунт напрямую:
+
+```text id="5nwv92"
+http://127.0.0.1:8090/account
+```
+
+И создать билет в блоке:
+
+```text id="a6ylc9"
+Create ticket
+```
+
+---
+
+# Часть 3. Оплата билета
+
+Для участия в розыгрыше билет должен быть оплачен. 
+Этот этап уже подробно описан в **Сценарии 2**, поэтому здесь только краткая схема.
+
+Нужно выполнить:
+
+```text id="4m5dgu"
+1. Создать invoice для билета.
+2. Дождаться, пока payment outbox создаст mock invoice.
+3. Отправить mock webhook PAYMENT_SUCCEEDED.
+4. Проверить, что билет стал PAID.
+```
+
+## Краткие команды
+
+Создать invoice:
+
+```bash id="hth2bj"
+INVOICE_RESPONSE=$(curl -s -X POST "$BASE/tickets/$TICKET_ID/invoice" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" \
+  -d "{
+    \"providerCode\": \"mock\",
+    \"idempotencyKey\": \"invoice-$TICKET_ID-$(date +%s)\"
+  }")
+
+echo "$INVOICE_RESPONSE" | jq
+```
+
+Подождать обработку outbox:
+
+```bash id="sfspve"
+sleep 12
+```
+
+Получить invoice:
+
+```bash id="w6xvf0"
+INVOICE_CURRENT=$(curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_ID/invoice")
+
+echo "$INVOICE_CURRENT" | jq
+
+export EXTERNAL_INVOICE_ID=$(echo "$INVOICE_CURRENT" | jq -r '.externalInvoiceId')
+echo "$EXTERNAL_INVOICE_ID"
+```
+
+Подготовить secret:
+
+```bash id="0zqqby"
+export WEBHOOK_SECRET=$(grep '^LOTTERY_MOCK_PAYMENT_WEBHOOK_SECRET=' .env.example | cut -d= -f2-)
+echo "$WEBHOOK_SECRET"
+```
+
+Отправить успешный webhook:
+
+```bash id="t16p2v"
+EVENT_ID="evt-success-$EXTERNAL_INVOICE_ID-$(date +%s)-$RANDOM"
+PAYLOAD="{\"eventId\":\"$EVENT_ID\",\"eventType\":\"PAYMENT_SUCCEEDED\",\"externalInvoiceId\":\"$EXTERNAL_INVOICE_ID\"}"
+SIGNATURE=$(printf '%s' "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $NF}')
+
+curl -s -X POST "$BASE/payment-providers/mock/webhook" \
+  -H "Content-Type: application/json" \
+  -H "X-Mock-Signature: $SIGNATURE" \
+  -d "$PAYLOAD" | jq
+```
+
+Проверить билет:
+
+```bash id="56um18"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_ID" | jq '{
+    id,
+    status,
+    combinationValues,
+    priceAmount,
+    priceCurrency
+  }'
+```
+
+Ожидаемый статус:
+
+```text id="i2gjg2"
+PAID
+```
+
+---
+
+# Часть 4. Определение результата
+
+Определение результата уже было описано в **Сценарии 1, шаги 13–16**, поэтому здесь кратко.
+
+Чтобы определить результат, нужно:
+
+```text id="u05wfq"
+1. Закрыть продажи.
+2. Запустить розыгрыш.
+3. Получить результат тиража.
+4. Проверить результат билета.
+```
+
+---
+
+## 4.1. Закрыть продажи
+
+```bash id="wlfxee"
+curl -s -X POST "$BASE/draws/$DRAW_ID/close-sales" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+```
+
+Ожидаемый статус тиража:
+
+```text id="8or8pc"
+SALES_CLOSED
+```
+
+Проверить:
+
+```bash id="7hfgvy"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/draws/$DRAW_ID" | jq '{id, title, status}'
+```
+
+---
+
+## 4.2. Запустить розыгрыш
+
+```bash id="mxxl3j"
+RUN_RESPONSE=$(curl -s -X POST "$BASE/draws/$DRAW_ID/run" \
+  -H "Authorization: Bearer $ADMIN_TOKEN")
+
+echo "$RUN_RESPONSE" | jq
+```
+
+После этого backend:
+
+```text id="v3owyo"
+1. Генерирует выигрышную комбинацию.
+2. Создаёт draw_result.
+3. Обрабатывает оплаченные билеты.
+4. Проставляет билетам WIN или LOSE.
+5. Переводит тираж в COMPLETED.
+```
+
+Проверить статус тиража:
+
+```bash id="mi2jz5"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/draws/$DRAW_ID" | jq '{id, title, status}'
+```
+
+Ожидаемый статус:
+
+```text id="hs3n7m"
+COMPLETED
+```
+
+---
+
+## 4.3. Получить результат тиража через curl
+
+```bash id="pjzek4"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/draws/$DRAW_ID/result" | jq
+```
+
+Пример ответа:
+
+```json id="bmpo8p"
+{
+  "id": "7716fc8c-...",
+  "drawId": "8f3be9e5-...",
+  "winningCombinationValues": ["7", "1"],
+  "algorithmVersion": "json-schema-secure-random-v1",
+  "randomProvider": "SecureRandom",
+  "proofHash": "...",
+  "generatedAt": "2026-05-10T..."
+}
+```
+
+---
+
+## 4.4. Получить результат тиража через UI
+
+Открыть страницу тиража:
+
+```text id="22d3v7"
+http://127.0.0.1:8090/draws/<DRAW_ID>
+```
+
+На странице будет блок:
+
+```text id="0rnsct"
+Draw result
+```
+
+Если розыгрыш завершён, там отображаются:
+
+```text id="t20qrz"
+Winning combination
+Generated at
+Algorithm
+Random provider
+Proof hash
+Request ID
+```
+
+Если розыгрыш ещё не завершён, будет сообщение:
+
+```text id="k0jzy0"
+Result is not published yet.
+```
+
+---
+
+## 4.5. Проверить результат билета через curl
+
+```bash id="zxd4p9"
+curl -s -X POST "$BASE/tickets/$TICKET_ID/check" \
+  -H "Authorization: Bearer $CLIENT_TOKEN" | jq
+```
+
+Ожидаемый статус билета:
+
+```text id="i57ufk"
+WIN
+```
+
+или:
+
+```text id="4i3awi"
+LOSE
+```
+
+Проверить билет после определения результата:
+
+```bash id="d72mhz"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_ID" | jq '{
+    id,
+    drawId,
+    status,
+    combinationValues,
+    matchPercent,
+    prizeId,
+    participatedAt,
+    checkedAt
+  }'
+```
+
+---
+
+## 4.6. Проверить результат билета через UI
+
+Открыть страницу билета:
+
+```text id="ak6b8j"
+http://127.0.0.1:8090/account/tickets/<TICKET_ID>
+```
+
+Нажать:
+
+```text id="7ypv77"
+Check result
+```
+
+В карточке билета будут отображаться:
+
+```text id="ueao7u"
+Status
+Draw
+Combination
+Price
+Created
+Participated
+Checked
+Match percent
+Prize
+```
+
+После завершения розыгрыша статус должен стать:
+
+```text id="5ejslz"
+WIN
+```
+
+или:
+
+```text id="66bptf"
+LOSE
+```
+
+---
+
+# Часть 5. История завершённых тиражей
+
+В текущем проекте есть два способа посмотреть завершённые тиражи:
+
+```text id="dxat78"
+1. Публичный список тиражей /draws — показывает список тиражей.
+2. Админский отчёт /admin/reports — позволяет фильтровать тиражи по статусу COMPLETED.
+```
+
+---
+
+## 5.1. История завершённых тиражей через UI
+
+### Вариант 1. Через страницу тиражей
+
+Открыть:
+
+```text id="w5lsrb"
+http://127.0.0.1:8090/draws
+```
+
+В списке найти тиражи со статусом:
+
+```text id="owd1jx"
+COMPLETED
+```
+
+Открыть конкретный завершённый тираж:
+
+```text id="tmlmx1"
+http://127.0.0.1:8090/draws/<DRAW_ID>
+```
+
+На странице завершённого тиража будет виден результат в блоке:
+
+```text id="qw8k6p"
+Draw result
+```
+
+---
+
+### Вариант 2. Через админский отчёт
+
+Открыть:
+
+```text id="sp29g9"
+http://127.0.0.1:8090/admin/reports
+```
+
+В блоке:
+
+```text id="p63z3j"
+Draw report filters
+```
+
+выставить:
+
+```text id="ntry8p"
+Status: Completed
+Page size: 50
+```
+
+Нажать:
+
+```text id="j18etk"
+Apply
+```
+
+В таблице `Draw report` будут отображены завершённые тиражи.
+
+Важно: для доступа нужен admin-пользователь или право:
+
+```text id="k29a92"
+report.draw.export
+```
+
+---
+
+## 5.2. История завершённых тиражей через curl
+
+### Получить все тиражи и отфильтровать COMPLETED локально
+
+```bash id="187h71"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/draws?limit=100&offset=0" \
+  | jq '.items[] | select(.status == "COMPLETED") | {
+      id,
+      title,
+      status,
+      salesStartAt,
+      salesEndAt,
+      drawAt,
+      createdAt
+    }'
+```
+
+---
+
+### Получить завершённые тиражи через reports API
+
+```bash id="zdq98c"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/draws?status=COMPLETED&limit=100&offset=0" | jq
+```
+
+Ответ будет в формате:
+
+```json id="gi2abj"
+{
+  "items": [
+    {
+      "id": "...",
+      "title": "Demo basic lottery",
+      "status": "COMPLETED",
+      "salesStartAt": "...",
+      "salesEndAt": "...",
+      "drawAt": "...",
+      "createdAt": "..."
+    }
+  ],
+  "total": 1,
+  "limit": 100,
+  "offset": 0,
+  "hasMore": false
+}
+```
+
+---
+
+### Получить результат конкретного завершённого тиража
+
+```bash id="1un9zh"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/draws/$DRAW_ID/result" | jq
+```
+
+---
+
+# Часть 6. История билетов пользователя
+
+История билетов доступна клиенту на странице аккаунта и через API.
+
+---
+
+## 6.1. История билетов пользователя через UI
+
+Открыть:
+
+```text id="8ccwf0"
+http://127.0.0.1:8090/account
+```
+
+На странице есть несколько блоков:
+
+```text id="pzqjki"
+Account
+Create ticket
+Ticket list
+Result history
+```
+
+В `Ticket list` отображаются билеты пользователя.
+
+В `Result history` отображаются билеты, у которых уже есть результат:
+
+```text id="9m4t6e"
+WIN
+LOSE
+CHECKED
+PARTICIPATED
+NOT_PARTICIPATED
+```
+
+Для конкретного билета можно открыть:
+
+```text id="bdrqd6"
+http://127.0.0.1:8090/account/tickets/<TICKET_ID>
+```
+
+Там отображаются:
+
+```text id="x0t4rl"
+статус билета
+комбинация
+цена
+дата создания
+дата участия
+дата проверки
+процент совпадения
+приз
+```
+
+---
+
+## 6.2. История билетов пользователя через curl
+
+Получить все билеты пользователя:
+
+```bash id="dykvyd"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets?userId=$CLIENT_USER_ID&limit=100&offset=0" | jq
+```
+
+Вывести в компактном виде:
+
+```bash id="ji4yfk"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets?userId=$CLIENT_USER_ID&limit=100&offset=0" \
+  | jq '.items[] | {
+      id,
+      drawId,
+      status,
+      combinationValues,
+      priceAmount,
+      priceCurrency,
+      matchPercent,
+      prizeId,
+      participatedAt,
+      checkedAt,
+      createdAt
+    }'
+```
+
+---
+
+## 6.3. Посмотреть только билеты с результатом WIN или LOSE
+
+```bash id="gw8mlr"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets?userId=$CLIENT_USER_ID&limit=100&offset=0" \
+  | jq '.items[] | select(.status == "WIN" or .status == "LOSE") | {
+      id,
+      drawId,
+      status,
+      combinationValues,
+      matchPercent,
+      prizeId,
+      checkedAt
+    }'
+```
+
+---
+
+## 6.4. Посмотреть конкретный билет
+
+```bash id="n6wvlv"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_ID" | jq
+```
+
+---
+
+# Часть 7. Простой отчёт по тиражам в JSON
+
+Отчёты доступны через:
+
+```text id="fbpsd1"
+GET /api/v1/reports/draws
+GET /api/v1/reports/tickets
+GET /api/v1/reports/draws/export
+GET /api/v1/reports/tickets/export
+```
+
+Для отчётов нужен admin-пользователь или соответствующие права:
+
+```text id="jv7r6c"
+report.draw.export
+report.ticket.export
+```
+
+---
+
+## 7.1. JSON-отчёт по завершённым тиражам через UI
+
+Открыть:
+
+```text id="peftc6"
+http://127.0.0.1:8090/admin/reports
+```
+
+В блоке `Draw report filters` указать:
+
+```text id="supv1k"
+Status: Completed
+Page size: 50
+```
+
+Нажать:
+
+```text id="g7jv6s"
+JSON
+```
+
+Браузер скачает JSON-отчёт.
+
+---
+
+## 7.2. JSON-отчёт по завершённым тиражам через curl
+
+```bash id="5hs2z1"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/draws?status=COMPLETED&limit=100&offset=0" \
+  | jq
+```
+
+Сохранить в файл:
+
+```bash id="k0p69m"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/draws?status=COMPLETED&limit=100&offset=0" \
+  | jq > draw-report-completed.json
+```
+
+---
+
+## 7.3. JSON export endpoint
+
+```bash id="c1or7p"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/draws/export?format=json&status=COMPLETED&limit=100&offset=0" \
+  | jq > draw-report-completed-export.json
+```
+
+---
+
+# Часть 8. Простой отчёт по тиражам в CSV
+
+## Через UI
+
+Открыть:
+
+```text id="zfxr18"
+http://127.0.0.1:8090/admin/reports
+```
+
+В блоке `Draw report filters` указать:
+
+```text id="xqaemg"
+Status: Completed
+Page size: 50
+```
+
+Нажать:
+
+```text id="xsr96p"
+CSV
+```
+
+Браузер скачает файл:
+
+```text id="wumvlb"
+draw-report.csv
+```
+
+---
+
+## Через curl
+
+```bash id="cd0nyk"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/draws/export?format=csv&status=COMPLETED&limit=100&offset=0" \
+  -o draw-report-completed.csv
+```
+
+Проверить файл:
+
+```bash id="io8hip"
+cat draw-report-completed.csv
+```
+
+CSV содержит поля:
+
+```text id="nrqs03"
+id,title,status,managerId,combinationSchemaId,salesStartAt,salesEndAt,drawAt,test,createdAt,version
+```
+
+---
+
+# Часть 9. Простой отчёт по билетам в JSON
+
+## 9.1. JSON-отчёт по билетам конкретного пользователя через UI
+
+Открыть:
+
+```text id="xmm0u9"
+http://127.0.0.1:8090/admin/reports
+```
+
+В блоке `Ticket report filters` указать:
+
+```text id="j1ytgj"
+User ID: <CLIENT_USER_ID>
+Status: Any status или Win/Lose
+Page size: 50
+```
+
+Нажать:
+
+```text id="pcgj80"
+Apply
+```
+
+Для скачивания нажать:
+
+```text id="5i64tc"
+JSON
+```
+
+---
+
+## 9.2. JSON-отчёт по билетам конкретного пользователя через curl
+
+```bash id="q61xwx"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets?userId=$CLIENT_USER_ID&limit=100&offset=0" \
+  | jq
+```
+
+Сохранить:
+
+```bash id="i3mi9h"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets?userId=$CLIENT_USER_ID&limit=100&offset=0" \
+  | jq > ticket-report-user.json
+```
+
+---
+
+## 9.3. JSON-отчёт только по выигравшим билетам
+
+```bash id="rxqn52"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets?userId=$CLIENT_USER_ID&status=WIN&limit=100&offset=0" \
+  | jq > ticket-report-user-win.json
+```
+
+---
+
+## 9.4. JSON-отчёт только по проигравшим билетам
+
+```bash id="wwwhh6"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets?userId=$CLIENT_USER_ID&status=LOSE&limit=100&offset=0" \
+  | jq > ticket-report-user-lose.json
+```
+
+---
+
+# Часть 10. Простой отчёт по билетам в CSV
+
+## Через UI
+
+Открыть:
+
+```text id="0ecqfc"
+http://127.0.0.1:8090/admin/reports
+```
+
+В блоке `Ticket report filters` указать:
+
+```text id="i67xyk"
+User ID: <CLIENT_USER_ID>
+Status: Any status / Win / Lose / Paid
+Page size: 50
+```
+
+Нажать:
+
+```text id="0hk5xt"
+CSV
+```
+
+Браузер скачает файл:
+
+```text id="c1ciek"
+ticket-report.csv
+```
+
+---
+
+## Через curl
+
+CSV-отчёт по всем билетам пользователя:
+
+```bash id="ldvjg2"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets/export?format=csv&userId=$CLIENT_USER_ID&limit=100&offset=0" \
+  -o ticket-report-user.csv
+```
+
+CSV-отчёт только по билетам конкретного тиража:
+
+```bash id="l2godo"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets/export?format=csv&drawId=$DRAW_ID&limit=100&offset=0" \
+  -o ticket-report-draw.csv
+```
+
+CSV-отчёт только по выигравшим билетам:
+
+```bash id="9gks03"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets/export?format=csv&status=WIN&limit=100&offset=0" \
+  -o ticket-report-win.csv
+```
+
+Проверить файл:
+
+```bash id="iuzmc4"
+cat ticket-report-user.csv
+```
+
+CSV содержит поля:
+
+```text id="ock9xy"
+id,userId,drawId,status,priceAmount,priceCurrency,test,createdAt,version
+```
+
+---
+
+# Часть 11. Получить аналитику через jq без отдельного backend-отчёта
+
+В проекте уже есть отчёты списком, но нет отдельного аналитического endpoint’а вида `/analytics/summary`. 
+Поэтому простой аналитический результат можно получить через `jq` поверх JSON-отчёта.
+
+---
+
+## 11.1. Количество билетов по статусам
+
+```bash id="o03j3z"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets?drawId=$DRAW_ID&limit=250&offset=0" \
+  | jq '
+      .items
+      | group_by(.status)
+      | map({
+          status: .[0].status,
+          count: length
+        })
+    '
+```
+
+Пример результата:
+
+```json id="u4rcoo"
+[
+  {
+    "status": "WIN",
+    "count": 1
+  },
+  {
+    "status": "LOSE",
+    "count": 3
+  }
+]
+```
+
+---
+
+## 11.2. Количество WIN / LOSE по конкретному тиражу
+
+```bash id="3zqiba"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets?drawId=$DRAW_ID&limit=250&offset=0" \
+  | jq '
+      {
+        drawId: env.DRAW_ID,
+        totalTickets: (.items | length),
+        winTickets: (.items | map(select(.status == "WIN")) | length),
+        loseTickets: (.items | map(select(.status == "LOSE")) | length),
+        paidTickets: (.items | map(select(.status == "PAID")) | length)
+      }
+    '
+```
+
+---
+
+## 11.3. Простая аналитика по завершённым тиражам
+
+```bash id="76u2rg"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/draws?status=COMPLETED&limit=250&offset=0" \
+  | jq '
+      {
+        completedDraws: (.items | length),
+        draws: [.items[] | {
+          id,
+          title,
+          status,
+          salesEndAt,
+          drawAt,
+          createdAt
+        }]
+      }
+    '
+```
+
+---
+
+# Часть 12. Полная проверка сценария одним набором команд
+
+Этот блок можно использовать после того, как тираж создан, билет создан, билет оплачен и розыгрыш запущен.
+
+```bash id="6j7n6c"
+echo "1. Draw status"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/draws/$DRAW_ID" | jq '{id, title, status}'
+
+echo "2. Draw result"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/draws/$DRAW_ID/result" | jq
+
+echo "3. Ticket result"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets/$TICKET_ID" | jq '{
+    id,
+    drawId,
+    status,
+    combinationValues,
+    matchPercent,
+    prizeId,
+    participatedAt,
+    checkedAt
+  }'
+
+echo "4. Completed draws history"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/draws?status=COMPLETED&limit=100&offset=0" \
+  | jq '.items[] | {id, title, status, drawAt, createdAt}'
+
+echo "5. User ticket history"
+curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
+  "$BASE/tickets?userId=$CLIENT_USER_ID&limit=100&offset=0" \
+  | jq '.items[] | {
+      id,
+      drawId,
+      status,
+      combinationValues,
+      matchPercent,
+      prizeId,
+      checkedAt
+    }'
+
+echo "6. Ticket analytics by status"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/reports/tickets?drawId=$DRAW_ID&limit=250&offset=0" \
+  | jq '.items | group_by(.status) | map({status: .[0].status, count: length})'
+```
+
+---
+
+# Краткая схема сценария 3
+
+```text id="n78wp8"
+1. Создать тираж
+   Уже описано в сценарии 1.
+
+2. Активировать тираж
+   Уже описано в сценарии 1.
+
+3. Создать билет
+   Уже описано в сценарии 1.
+
+4. Оплатить билет
+   Уже описано в сценарии 2.
+
+5. Закрыть продажи
+   Уже описано в сценарии 1.
+
+6. Запустить розыгрыш
+   Уже описано в сценарии 1.
+
+7. Проверить результат билета
+   Через curl: POST /tickets/{ticketId}/check
+   Через UI: /account/tickets/{ticketId} → Check result
+
+8. Посмотреть историю завершённых тиражей
+   Через UI: /draws или /admin/reports
+   Через curl: GET /reports/draws?status=COMPLETED
+
+9. Посмотреть историю билетов пользователя
+   Через UI: /account
+   Через curl: GET /tickets?userId={userId}
+
+10. Получить отчёт
+   JSON: /reports/draws или /reports/tickets
+   CSV: /reports/draws/export?format=csv или /reports/tickets/export?format=csv
+```
+
+---
+
+# Важные замечания
+
+1. **История завершённых тиражей** в пользовательском интерфейсе отображается через общий список `/draws`, 
+а более точная фильтрация по `COMPLETED` есть в админском разделе `/admin/reports`.
+
+2. **История билетов пользователя** доступна клиенту через `/account`.
+
+3. **Отчёты JSON/CSV** доступны через админский раздел и требуют прав `report.draw.export` или `report.ticket.export`.
+
+4. В `draw report` параметр `userId` фактически используется как фильтр по менеджеру тиража, то есть по `managerId`.
+
+5. В `reports` фильтры `dateFrom` и `dateTo` работают по дате создания записи, 
+то есть по `createdAt`, а не по дате завершения тиража.

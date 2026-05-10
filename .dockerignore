@@ -1,0 +1,16 @@
+.git
+.idea
+*.iml
+.DS_Store
+
+backend/target
+frontend/node_modules
+frontend/dist
+frontend/storybook-static
+.pnpm-store
+
+backups
+*.log
+.env
+.env.*
+!*.env.example

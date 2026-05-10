@@ -77,8 +77,9 @@ import com.lottery.infrastructure.persistence.jdbc.JdbcUserRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcWinningRuleRepository;
 import com.lottery.infrastructure.security.BcryptPasswordHasher;
 import com.lottery.infrastructure.security.DatabaseAuthorizationAdapter;
-import com.lottery.infrastructure.security.InMemorySessionTokenService;
+import com.lottery.infrastructure.security.HmacTokenService;
 import com.lottery.presentation.error.GlobalErrorHandler;
+import com.lottery.presentation.middleware.CorsFilter;
 import com.lottery.presentation.middleware.RequestContextFilter;
 import com.lottery.presentation.rest.OpenApiServlet;
 import com.lottery.presentation.rest.ServletUseCaseContextFactory;
@@ -137,7 +138,7 @@ public final class ApplicationConfig {
         AuthorizationPort authorizationPort = new DatabaseAuthorizationAdapter(rbacRepository);
         AuditService auditService = new AuditService(auditLogRepository, rbacRepository, clock);
         PasswordHasher passwordHasher = new BcryptPasswordHasher(properties.bcryptCost());
-        InMemorySessionTokenService tokenService = new InMemorySessionTokenService(properties.accessTokenTtlSeconds());
+        HmacTokenService tokenService = new HmacTokenService(properties.accessTokenSecret(), properties.accessTokenTtlSeconds());
         MockPaymentProviderAdapter paymentProvider = new MockPaymentProviderAdapter(properties.mockPaymentWebhookSecret());
 
         CreateUserUseCase createUserUseCase = new CreateUserUseCase(
@@ -359,6 +360,7 @@ public final class ApplicationConfig {
         ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService, rbacRepository);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath("/");
+        context.addFilter(new FilterHolder(new CorsFilter(properties.corsAllowedOrigins())), "/*", EnumSet.of(DispatcherType.REQUEST));
         context.addFilter(new FilterHolder(new RequestContextFilter()), "/*", EnumSet.of(DispatcherType.REQUEST));
         context.addServlet(new ServletHolder(new HealthServlet(objectMapper, errorHandler)), "/health");
         context.addServlet(new ServletHolder(new ReadyServlet(objectMapper, errorHandler, dataSource)), "/ready");

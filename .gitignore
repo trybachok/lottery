@@ -25,10 +25,17 @@ out/
 # Generated files
 .idea/**/contentModel.xml
 backend/target/
+backend/dependency-reduced-pom.xml
 frontend/dist/
 frontend/node_modules/
 frontend/storybook-static/
 .pnpm-store/
+backups/
+.env
+.env.*
+!.env.example
+deploy/env/*.env
+!deploy/env/*.env.example
 
 # File-based project format
 *.iws

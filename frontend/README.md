@@ -1,67 +1,67 @@
-# Lottery Frontend
+# Фронтенд Lottery
 
-Frontend lottery system is a Vue 3 application for client lottery workflows, administrative management, API documentation viewing and configurable Home page presentation.
+Фронтенд lottery system - это приложение на Vue 3 для клиентских сценариев лотереи, административного управления, просмотра API-документации и настраиваемого представления главной страницы.
 
-## What The Frontend Does
+## Что Делает Фронтенд
 
-The frontend provides user interfaces for the main lottery system workflows:
+Фронтенд предоставляет пользовательские интерфейсы для основных сценариев lottery system:
 
-- Public Home page rendered from backend-managed UI template.
-- Light and dark theme selection with the selected theme saved in the browser.
-- User registration and password login.
-- Authenticated draw list and draw details pages.
-- Ticket purchase flow with combination input.
-- Account page with client tickets.
-- Ticket details page with invoice status, payment actions and result history.
-- API documentation page based on Swagger UI, available only for system administrators.
-- Forbidden page for access-denied scenarios.
-- Administrative shell with role-aware navigation.
+- Публичная главная страница, отрисованная из UI-шаблона, управляемого бэкендом.
+- Выбор светлой и темной темы с сохранением выбранной темы в браузере.
+- Регистрация пользователя и вход по паролю.
+- Страницы списка авторизованных тиражей и деталей тиража.
+- Сценарий покупки билета с вводом комбинации.
+- Страница аккаунта с билетами клиента.
+- Страница деталей билета со статусом счета, платежными действиями и историей результатов.
+- Страница API-документации на основе Swagger UI, доступная только системным администраторам.
+- Страница запрета доступа для сценариев отказа в доступе.
+- Административная оболочка с навигацией, учитывающей роль.
 
-Administrative screens include:
+Административные экраны включают:
 
-- Dashboard entry page.
-- User management.
-- Role management and user role assignment.
-- Permission management and role permission assignment.
-- Draw management and manager assignment.
-- Draw and ticket reports.
-- Audit log inspection.
-- Home page settings.
-- UI theme management.
-- UI template management.
+- Стартовую страницу панели управления.
+- Управление пользователями.
+- Управление ролями и назначение ролей пользователям.
+- Управление разрешениями и назначение разрешений ролям.
+- Управление тиражами и назначение менеджеров.
+- Отчеты по тиражам и билетам.
+- Просмотр журнала аудита.
+- Настройки главной страницы.
+- Управление UI-темами.
+- Управление UI-шаблонами.
 
-## Architecture
+## Архитектура
 
-The frontend is organized close to Feature-Sliced Design:
+Фронтенд организован близко к Feature-Sliced Design:
 
-- `src/app`: application-level router and route guards.
-- `src/pages`: route-level pages.
-- `src/features`: feature modules with API adapters, stores and UI components.
-- `src/widgets`: larger reusable page widgets, such as admin sidebar.
-- `src/shared`: generated API client, common utilities and shared UI components.
+- `src/app`: маршрутизатор уровня приложения и route guards.
+- `src/pages`: страницы уровня маршрутов.
+- `src/features`: feature-модули с API-адаптерами, хранилищами и UI-компонентами.
+- `src/widgets`: более крупные переиспользуемые виджеты страниц, например боковая панель администратора.
+- `src/shared`: сгенерированный API-клиент, общие утилиты и общие UI-компоненты.
 
-Feature modules usually follow this structure:
+Feature-модули обычно следуют такой структуре:
 
-- `api`: typed wrappers around generated OpenAPI SDK methods.
-- `model`: Pinia stores and feature state.
-- `ui`: reusable feature components.
+- `api`: типизированные обертки вокруг методов сгенерированного OpenAPI SDK.
+- `model`: Pinia-хранилища и состояние feature-модуля.
+- `ui`: переиспользуемые компоненты feature-модуля.
 
-The frontend does not contain backend business rules. Permissions and role checks are used for UX routing/navigation, while the backend remains the source of truth for authorization.
+Фронтенд не содержит бизнес-правил бэкенда. Проверки разрешений и ролей используются для UX-маршрутизации и навигации, а бэкенд остается источником истины для авторизации.
 
-## Main Pages
+## Основные Страницы
 
-Public and client pages:
+Публичные и клиентские страницы:
 
-- `/`: configurable Home page.
-- `/login`: password login.
-- `/register`: user registration.
-- `/draws`: available draws.
-- `/draws/:drawId`: draw details and result data.
-- `/account`: client account and tickets.
-- `/account/tickets/:ticketId`: ticket details, invoice state and result history.
-- `/forbidden`: access denied page.
+- `/`: настраиваемая главная страница.
+- `/login`: вход по паролю.
+- `/register`: регистрация пользователя.
+- `/draws`: доступные тиражи.
+- `/draws/:drawId`: детали тиража и данные результата.
+- `/account`: аккаунт клиента и билеты.
+- `/account/tickets/:ticketId`: детали билета, состояние счета и история результатов.
+- `/forbidden`: страница отказа в доступе.
 
-Admin pages:
+Страницы администратора:
 
 - `/admin`
 - `/admin/users`
@@ -74,72 +74,72 @@ Admin pages:
 - `/admin/ui-themes`
 - `/admin/ui-templates`
 
-API documentation:
+API-документация:
 
-- `/docs`: Swagger UI page for the backend OpenAPI contract. The route requires authentication and `ADMIN` role.
+- `/docs`: страница Swagger UI для OpenAPI-контракта бэкенда. Маршрут требует аутентификации и роли `ADMIN`.
 
-## Authentication And Authorization
+## Аутентификация И Авторизация
 
-The frontend stores the authenticated session in the auth store and attaches bearer tokens to backend requests through the shared API client configuration.
+Фронтенд хранит аутентифицированную сессию в auth-хранилище и добавляет bearer-токены к запросам на бэкенд через конфигурацию общего API-клиента.
 
-Implemented UX checks:
+Реализованные UX-проверки:
 
-- Public-only redirects for login/register when already authenticated.
-- Auth-required route guard.
-- Admin-only route guard for `/docs`.
-- Permission-based admin route access.
-- Role-aware admin navigation filtering.
+- Редиректы с login/register для уже аутентифицированных пользователей.
+- Route guard для маршрутов, требующих аутентификации.
+- Route guard только для администраторов на `/docs`.
+- Доступ к административным маршрутам на основе разрешений.
+- Фильтрация административной навигации с учетом ролей.
 
-Security note: frontend guards improve user experience, but all real authorization decisions are enforced by the backend.
+Примечание по безопасности: фронтенд-guards улучшают пользовательский опыт, но все реальные решения по авторизации применяются бэкендом.
 
-## Home Page, Themes And Templates
+## Главная Страница, Темы И Шаблоны
 
-The Home page is configured by backend settings:
+Главная страница настраивается параметрами бэкенда:
 
-- `GET /api/v1/home-page` returns active template, default theme and available themes.
-- `HomeLayoutRenderer` renders template regions:
+- `GET /api/v1/home-page` возвращает активный шаблон, тему по умолчанию и доступные темы.
+- `HomeLayoutRenderer` отрисовывает регионы шаблона:
   - header;
   - banner;
   - sidebar;
   - main;
   - footer.
-- `ThemeSwitcher` allows switching between available themes.
-- `theme.store.ts` saves selected theme id in `localStorage` under `lottery.theme.id`.
-- Theme colors are applied through CSS variables on `document.documentElement`.
+- `ThemeSwitcher` позволяет переключаться между доступными темами.
+- `theme.store.ts` сохраняет id выбранной темы в `localStorage` под ключом `lottery.theme.id`.
+- Цвета темы применяются через CSS-переменные на `document.documentElement`.
 
-Admin users can manage:
+Администраторы могут управлять:
 
-- UI themes on `/admin/ui-themes`.
-- Home page templates on `/admin/ui-templates`.
-- Active Home template and default theme on `/admin/settings`.
+- UI-темами на `/admin/ui-themes`.
+- Шаблонами главной страницы на `/admin/ui-templates`.
+- Активным шаблоном главной страницы и темой по умолчанию на `/admin/settings`.
 
-## API Client
+## API-Клиент
 
-The frontend uses an OpenAPI-generated TypeScript client.
+Фронтенд использует TypeScript-клиент, сгенерированный из OpenAPI.
 
-Generated files are located in:
+Сгенерированные файлы находятся в:
 
 ```text
 src/shared/api/generated
 ```
 
-The source contract is:
+Исходный контракт:
 
 ```text
 ../backend/src/main/resources/openapi/openapi.yaml
 ```
 
-Regenerate the client after backend API changes:
+После изменений backend API перегенерируйте клиент:
 
 ```bash
 pnpm api:generate
 ```
 
-Feature API modules wrap generated SDK calls so pages and stores do not depend directly on raw generated functions.
+Feature API-модули оборачивают вызовы сгенерированного SDK, чтобы страницы и хранилища не зависели напрямую от сырых сгенерированных функций.
 
-## Shared UI
+## Общий UI
 
-Reusable UI primitives live in `src/shared/ui`, including:
+Переиспользуемые UI-примитивы находятся в `src/shared/ui`, включая:
 
 - `BaseButton`
 - `BaseCard`
@@ -150,11 +150,11 @@ Reusable UI primitives live in `src/shared/ui`, including:
 - `AppErrorMessage`
 - `AppLoader`
 
-Several feature components and shared components have Storybook stories for isolated review.
+У нескольких feature-компонентов и общих компонентов есть Storybook stories для изолированного просмотра.
 
-## Technologies
+## Технологии
 
-Core stack:
+Основной стек:
 
 - Vue 3
 - TypeScript
@@ -163,68 +163,68 @@ Core stack:
 - Pinia
 - Axios
 
-API and docs:
+API и документация:
 
 - `@hey-api/openapi-ts`
-- Swagger UI via `swagger-ui-dist`
+- Swagger UI через `swagger-ui-dist`
 
-UI development and verification:
+Разработка и проверка UI:
 
 - Storybook
 - Vue TSC
 - ESLint
 - Prettier
 
-Production delivery:
+Production-доставка:
 
-- Docker multi-stage frontend build.
-- Nginx runtime image.
+- Многоэтапная сборка frontend Docker-образа.
+- Runtime-образ Nginx.
 - Nginx SPA fallback.
-- Nginx proxy for `/api/*` requests to backend.
+- Nginx proxy для запросов `/api/*` к бэкенду.
 
-Package manager:
+Менеджер пакетов:
 
 - pnpm
 
-## Local Development
+## Локальная Разработка
 
-Install dependencies:
+Установить зависимости:
 
 ```bash
 pnpm install
 ```
 
-Start Vite dev server:
+Запустить dev-сервер Vite:
 
 ```bash
 pnpm dev
 ```
 
-Build production bundle:
+Собрать production bundle:
 
 ```bash
 pnpm build:prod
 ```
 
-Preview production build locally:
+Локально просмотреть production-сборку:
 
 ```bash
 pnpm preview
 ```
 
-Regenerate API client:
+Перегенерировать API-клиент:
 
 ```bash
 pnpm api:generate
 ```
 
-Run Storybook:
+Запустить Storybook:
 
 ```bash
 pnpm storybook
 ```
 
-Build Storybook:
+Собрать Storybook:
 
 ```bash
 pnpm build-storybook
@@ -232,50 +232,50 @@ pnpm build-storybook
 
 ## Docker
 
-The production frontend image is built from `frontend/Dockerfile`.
+Production frontend-образ собирается из `frontend/Dockerfile`.
 
-The runtime container uses Nginx and `frontend/nginx/default.conf`:
+Runtime-контейнер использует Nginx и `frontend/nginx/default.conf`:
 
-- serves built static assets;
-- supports SPA routing fallback to `index.html`;
-- proxies API requests to backend;
-- exposes a frontend health endpoint.
+- отдает собранные статические assets;
+- поддерживает fallback SPA-маршрутизации на `index.html`;
+- проксирует API-запросы к бэкенду;
+- предоставляет frontend health endpoint.
 
-Run the full local stack from the repository root:
+Запустить полный локальный стек из корня репозитория:
 
 ```bash
 LOTTERY_HOST_HTTP_PORT=8090 docker compose --env-file .env.example up -d --build
 ```
 
-Then open:
+Затем открыть:
 
 ```text
 http://127.0.0.1:8090
 ```
 
-## Environment
+## Окружение
 
-Production API base URL is supplied at build time:
+Production base URL для API передается во время сборки:
 
 ```text
 VITE_API_BASE_URL=/api/v1
 ```
 
-For Docker deployment, the default setup uses relative `/api/v1`, allowing Nginx to proxy backend requests inside the compose network.
+Для Docker-развертывания стандартная конфигурация использует относительный `/api/v1`, позволяя Nginx проксировать запросы к бэкенду внутри compose-сети.
 
-## Quality Checks
+## Проверки Качества
 
-Before completing frontend changes, run:
+Перед завершением frontend-изменений выполните:
 
 ```bash
 pnpm api:generate
 pnpm build:prod
 ```
 
-When UI components change, also run:
+Если изменялись UI-компоненты, также выполните:
 
 ```bash
 pnpm build-storybook
 ```
 
-For frontend changes affecting visible screens, verify the application in a browser against the local Docker or Vite URL.
+Для frontend-изменений, влияющих на видимые экраны, проверьте приложение в браузере по локальному Docker- или Vite-URL.

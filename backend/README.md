@@ -1,48 +1,48 @@
-# Lottery Backend
+# Бэкенд Lottery
 
-Backend lottery system is a Java service that exposes a JSON REST API for client lottery workflows, administrative operations, payments, reports, auditing and UI configuration.
+Бэкенд lottery system - это Java-сервис, предоставляющий JSON REST API для клиентских сценариев лотереи, административных операций, платежей, отчетов, аудита и настройки UI.
 
-## What The Backend Does
+## Что Делает Бэкенд
 
-The backend implements the core business logic of the lottery platform:
+Бэкенд реализует основную бизнес-логику лотерейной платформы:
 
-- User registration, password login and bearer token authentication.
-- Role-based access control with backend as the source of truth.
-- Administrative user, role and permission management.
-- Draw lifecycle management: draft, scheduling, activation, sales closing, drawing, completion, cancellation and archival statuses.
-- Ticket creation, bulk ticket creation, cancellation, soft deletion and result checking.
-- Business rule enforcement for draws and tickets:
-  - only `PAID` tickets participate in a draw;
-  - a draw can be executed only once;
-  - a completed draw result is immutable;
-  - ownership checks protect client resources from IDOR.
-- Payment invoice creation, provider webhook processing, invoice cancellation, expiration and refunds.
-- Payment outbox worker for asynchronous provider-side actions.
-- Operational reports for draws and tickets with JSON and CSV export.
-- Audit log recording and audit log inspection.
-- OpenAPI contract serving, protected so only system administrators can access it.
-- Public Home page configuration API with active UI template and available themes.
-- Administrative UI theme, UI template and system settings management.
-- Health and readiness endpoints for container orchestration.
+- Регистрация пользователей, вход по паролю и аутентификация через bearer-токен.
+- Ролевой контроль доступа, где бэкенд является источником истины.
+- Административное управление пользователями, ролями и разрешениями.
+- Управление жизненным циклом тиража: черновик, планирование, активация, закрытие продаж, проведение розыгрыша, завершение, отмена и архивные статусы.
+- Создание билетов, массовое создание билетов, отмена, мягкое удаление и проверка результатов.
+- Применение бизнес-правил для тиражей и билетов:
+  - в розыгрыше участвуют только билеты со статусом `PAID`;
+  - тираж можно выполнить только один раз;
+  - результат завершенного тиража неизменяем;
+  - проверки владения защищают клиентские ресурсы от IDOR.
+- Создание платежных счетов, обработка webhook-событий провайдера, отмена счетов, истечение срока действия и возвраты.
+- Payment outbox worker для асинхронных действий на стороне провайдера.
+- Операционные отчеты по тиражам и билетам с экспортом в JSON и CSV.
+- Запись журнала аудита и просмотр журнала аудита.
+- Предоставление OpenAPI-контракта с защитой доступа только для системных администраторов.
+- API конфигурации публичной главной страницы с активным UI-шаблоном и доступными темами.
+- Административное управление UI-темами, UI-шаблонами и системными настройками.
+- Health и readiness endpoints для оркестрации контейнеров.
 
-## Architecture
+## Архитектура
 
-The service follows Clean Architecture with explicit dependency injection and no Spring/Spring Boot.
+Сервис следует Clean Architecture с явным dependency injection и без Spring/Spring Boot.
 
-Main layers:
+Основные слои:
 
-- `domain`: framework-independent business models, value objects, policies, services and repository interfaces.
-- `application`: use cases, DTOs, mappers, authorization ports, transaction ports and validation logic.
-- `infrastructure`: JDBC repositories, PostgreSQL/Flyway integration, security adapters, payment provider adapter, OpenAPI resource, configuration and runtime wiring.
-- `presentation`: Servlet REST adapters, middleware, error handling and JSON request/response mapping.
+- `domain`: независимые от фреймворков бизнес-модели, value objects, политики, сервисы и интерфейсы репозиториев.
+- `application`: use cases, DTO, мапперы, порты авторизации, порты транзакций и логика валидации.
+- `infrastructure`: JDBC-репозитории, интеграция PostgreSQL/Flyway, security adapters, адаптер платежного провайдера, OpenAPI-ресурс, конфигурация и runtime wiring.
+- `presentation`: Servlet REST adapters, middleware, обработка ошибок и JSON-маппинг запросов/ответов.
 
-Controllers/servlets are intentionally thin: they parse HTTP input, build use case context and call application use cases. Business rules live in domain/application code, not in repositories or HTTP adapters.
+Контроллеры/сервлеты намеренно остаются тонкими: они разбирают HTTP-ввод, формируют контекст use case и вызывают application use cases. Бизнес-правила находятся в domain/application коде, а не в репозиториях или HTTP-адаптерах.
 
 ## API
 
-Base path: `/api/v1`
+Базовый путь: `/api/v1`
 
-The API is JSON-first and documented by OpenAPI:
+API ориентирован на JSON и документирован через OpenAPI:
 
 - `POST /auth/register`
 - `POST /auth/login`
@@ -63,23 +63,23 @@ The API is JSON-first and documented by OpenAPI:
 - `GET /home-page`
 - `GET /openapi.yaml`
 
-OpenAPI is stored in `src/main/resources/openapi/openapi.yaml` and must be kept in sync with every API change.
+OpenAPI хранится в `src/main/resources/openapi/openapi.yaml` и должен поддерживаться в актуальном состоянии при каждом изменении API.
 
-## Security
+## Безопасность
 
-Implemented security features:
+Реализованные функции безопасности:
 
-- Password hashing with bcrypt.
-- HMAC-signed access tokens.
-- Backend-enforced RBAC permissions.
-- Admin-only access to the OpenAPI document.
-- Client ownership checks for client-owned resources.
-- Prepared SQL statements in JDBC repositories.
-- Validation of request data in application use cases.
-- CORS configuration via environment variables.
-- No secrets are stored in code; secrets are supplied through environment variables.
+- Хеширование паролей с помощью bcrypt.
+- Access-токены, подписанные HMAC.
+- RBAC-разрешения, применяемые бэкендом.
+- Доступ к OpenAPI-документу только для администраторов.
+- Проверки владения для ресурсов, принадлежащих клиентам.
+- Подготовленные SQL-запросы в JDBC-репозиториях.
+- Валидация данных запросов в application use cases.
+- Настройка CORS через переменные окружения.
+- Секреты не хранятся в коде; они передаются через переменные окружения.
 
-Important environment variables:
+Важные переменные окружения:
 
 - `LOTTERY_ACCESS_TOKEN_SECRET`
 - `LOTTERY_ACCESS_TOKEN_TTL_SECONDS`
@@ -90,48 +90,48 @@ Important environment variables:
 - `LOTTERY_JDBC_USER`
 - `LOTTERY_JDBC_PASSWORD`
 
-## Database
+## База Данных
 
-The backend uses PostgreSQL as the primary database.
+Бэкенд использует PostgreSQL как основную базу данных.
 
-Database management:
+Управление базой данных:
 
-- Flyway migrations under `src/main/resources/db/migration`.
+- Flyway-миграции в `src/main/resources/db/migration`.
 - UUID primary keys.
-- `timestamptz` timestamps.
-- JSONB fields for flexible schemas, draw results, UI templates, UI themes, audit snapshots and webhook payloads.
-- Partitioned high-volume tables where required by the specification, including tickets, audit logs and webhook events.
+- Временные метки `timestamptz`.
+- JSONB-поля для гибких схем, результатов тиражей, UI-шаблонов, UI-тем, audit snapshots и webhook payloads.
+- Партиционированные высоконагруженные таблицы там, где это требуется спецификацией, включая tickets, audit logs и webhook events.
 
-Seeded data includes:
+Начальные данные включают:
 
-- System roles and permissions.
-- Default UI themes.
-- Default Home page template.
-- Home page system setting.
+- Системные роли и разрешения.
+- UI-темы по умолчанию.
+- Шаблон главной страницы по умолчанию.
+- Системную настройку главной страницы.
 
-## Payments
+## Платежи
 
-Payment integration is represented by a mock provider adapter suitable for local and staged development.
+Платежная интеграция представлена mock provider adapter, подходящим для локальной разработки и staged-окружений.
 
-Implemented payment flows:
+Реализованные платежные сценарии:
 
-- Create invoice for ticket.
-- Queue provider invoice creation in payment outbox.
-- Process provider webhook events idempotently.
-- Cancel and expire invoices.
-- Queue and process refunds.
-- Prevent duplicate payment processing through idempotency and webhook event tracking.
+- Создание счета для билета.
+- Постановка создания счета у провайдера в payment outbox.
+- Идемпотентная обработка webhook-событий провайдера.
+- Отмена счетов и истечение срока их действия.
+- Постановка возвратов в очередь и их обработка.
+- Предотвращение дублирующей обработки платежей через идемпотентность и отслеживание webhook-событий.
 
-## UI Settings Backend
+## Бэкенд UI-Настроек
 
-The backend provides system settings used by the frontend Home page:
+Бэкенд предоставляет системные настройки, используемые frontend Home page:
 
-- `GET /api/v1/home-page` returns the active Home template, default theme and all available themes.
-- Admins can create and update UI themes.
-- Admins can create and update Home page templates.
-- Admins can choose the active Home template and default theme.
+- `GET /api/v1/home-page` возвращает активный Home template, default theme и все доступные themes.
+- Администраторы могут создавать и обновлять UI-темы.
+- Администраторы могут создавать и обновлять шаблоны главной страницы.
+- Администраторы могут выбирать активный шаблон главной страницы и тему по умолчанию.
 
-Template validation requires these regions:
+Валидация шаблона требует эти регионы:
 
 - `header`
 - `banner`
@@ -139,66 +139,66 @@ Template validation requires these regions:
 - `main`
 - `footer`
 
-Theme validation requires basic token structure with mode and color values.
+Валидация темы требует базовую структуру токенов с режимом и цветовыми значениями.
 
-## Technologies
+## Технологии
 
-Runtime and framework:
+Runtime и framework:
 
 - Java 25
 - Maven
 - Jetty 12
 - Jakarta Servlet API
 
-Persistence:
+Хранение данных:
 
 - PostgreSQL
 - JDBC
 - HikariCP
 - Flyway
 
-Serialization and API:
+Сериализация и API:
 
 - Jackson
 - OpenAPI 3.1
 
-Security:
+Безопасность:
 
 - bcrypt
 - HMAC token service
 
-Logging and tests:
+Логирование и тесты:
 
 - SLF4J
 - JUnit 5
 
-Packaging and deployment:
+Упаковка и развертывание:
 
 - Maven Shade Plugin
 - Docker multi-stage build
 - Docker Compose
 
-## Local Development
+## Локальная Разработка
 
-Run backend tests:
+Запустить backend-тесты:
 
 ```bash
 mvn -f backend/pom.xml test
 ```
 
-Build the backend jar:
+Собрать backend jar:
 
 ```bash
 mvn -f backend/pom.xml package
 ```
 
-Run the full local stack with Docker Compose:
+Запустить полный локальный стек с Docker Compose:
 
 ```bash
 LOTTERY_HOST_HTTP_PORT=8090 docker compose --env-file .env.example up -d --build
 ```
 
-Useful local checks:
+Полезные локальные проверки:
 
 ```bash
 curl http://127.0.0.1:8090/health
@@ -206,25 +206,25 @@ curl http://127.0.0.1:8090/ready
 curl http://127.0.0.1:8090/api/v1/home-page
 ```
 
-The OpenAPI document is protected and requires an admin bearer token:
+OpenAPI-документ защищен и требует admin bearer token:
 
 ```bash
 curl -H "Authorization: Bearer <ADMIN_TOKEN>" http://127.0.0.1:8090/api/v1/openapi.yaml
 ```
 
-## Testing
+## Тестирование
 
-The backend test suite covers:
+Backend test suite покрывает:
 
-- Authentication and token logic.
+- Логику аутентификации и токенов.
 - User/admin RBAC use cases.
-- Draw lifecycle rules.
-- Draw execution and ticket participation rules.
-- Ticket ownership and business workflows.
-- Payment invoice, webhook and refund flows.
-- Reports.
-- OpenAPI contract smoke checks.
-- Migration resource checks.
-- UI settings, Home page template and theme business logic.
+- Правила жизненного цикла тиража.
+- Выполнение тиража и правила участия билетов.
+- Владение билетами и бизнес-сценарии.
+- Сценарии платежных счетов, webhook и возвратов.
+- Отчеты.
+- Smoke checks OpenAPI-контракта.
+- Проверки migration resources.
+- UI-настройки, шаблон главной страницы и бизнес-логику тем.
 
-Run all backend tests before changing business logic or API contracts.
+Запускайте все backend-тесты перед изменением бизнес-логики или API-контрактов.

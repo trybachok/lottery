@@ -40,7 +40,7 @@ public final class RegisterUserUseCase {
     public UserDto execute(RegisterUserCommand command) {
         return transactionManager.inTransaction(() -> {
             String login = normalizeLogin(command);
-            boolean adminExists = rbacRepository.existsUserWithRoleCode(RoleCodes.ADMIN);
+            boolean firstUser = !userRepository.existsAny();
             if (userRepository.existsByEmail(command.email())) {
                 throw new ConflictException("USER_EMAIL_ALREADY_EXISTS", "User email already exists");
             }
@@ -49,7 +49,7 @@ public final class RegisterUserUseCase {
             }
             User user = User.create(command.email(), login, passwordHasher.hash(command.rawPassword()), clock.now());
             User saved = userRepository.save(user);
-            rbacRepository.assignRoleByCode(saved.id(), initialRoleCode(adminExists, login));
+            rbacRepository.assignRoleByCode(saved.id(), initialRoleCode(firstUser, login));
             return mapper.toDto(saved);
         });
     }
@@ -58,7 +58,7 @@ public final class RegisterUserUseCase {
         return command.login() == null ? command.email().trim() : command.login().trim();
     }
 
-    private String initialRoleCode(boolean adminExists, String login) {
-        return !adminExists && OWNER_LOGIN.equals(login) ? RoleCodes.ADMIN : RoleCodes.CLIENT;
+    private String initialRoleCode(boolean firstUser, String login) {
+        return firstUser && OWNER_LOGIN.equals(login) ? RoleCodes.ADMIN : RoleCodes.CLIENT;
     }
 }

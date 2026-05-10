@@ -67,29 +67,6 @@ public final class JdbcRbacRepository implements RbacRepository {
     }
 
     @Override
-    public boolean existsUserWithRoleCode(String roleCode) {
-        String sql = """
-                select 1
-                from user_roles ur
-                join roles r on r.id = ur.role_id
-                join users u on u.id = ur.user_id
-                where r.code = ? and u.deleted_at is null
-                limit 1
-                """;
-        try {
-            Connection connection = connectionProvider.currentConnection();
-            try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, roleCode);
-                try (ResultSet resultSet = statement.executeQuery()) {
-                    return resultSet.next();
-                }
-            }
-        } catch (SQLException exception) {
-            throw new IllegalStateException("Failed to check role assignment existence", exception);
-        }
-    }
-
-    @Override
     public List<Role> findAllRoles(int limit, int offset) {
         String sql = "select id, code, name, description, is_system from roles order by code limit ? offset ?";
         return findRoles(sql, statement -> {

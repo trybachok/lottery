@@ -33,6 +33,7 @@ const form = reactive({
 })
 
 const validationErrors = ref<Partial<Record<keyof typeof form, string>>>({})
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function submit(): void {
   validationErrors.value = validate()
@@ -63,6 +64,12 @@ function validate(): Partial<Record<keyof typeof form, string>> {
 
   if (!form.combinationSchemaId.trim()) {
     errors.combinationSchemaId = 'Enter combination schema id.'
+  } else if (!uuidPattern.test(form.combinationSchemaId.trim())) {
+    errors.combinationSchemaId = 'Enter a valid UUID.'
+  }
+
+  if (form.managerId.trim() && !uuidPattern.test(form.managerId.trim())) {
+    errors.managerId = 'Enter a valid UUID.'
   }
 
   if (!form.salesStartAt) {

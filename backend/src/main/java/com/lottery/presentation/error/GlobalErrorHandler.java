@@ -1,5 +1,6 @@
 package com.lottery.presentation.error;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.ApplicationException;
 import com.lottery.application.ConflictException;
@@ -55,6 +56,9 @@ public final class GlobalErrorHandler {
         }
         if (exception instanceof ApplicationException applicationException) {
             return new ErrorMapping(400, applicationException.code(), applicationException.getMessage(), applicationException.details());
+        }
+        if (exception instanceof JsonProcessingException) {
+            return new ErrorMapping(400, "VALIDATION_ERROR", "Malformed JSON request", Map.of());
         }
         if (exception instanceof IllegalArgumentException) {
             return new ErrorMapping(400, "VALIDATION_ERROR", exception.getMessage(), Map.of());

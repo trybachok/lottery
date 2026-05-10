@@ -11,6 +11,7 @@ export function registerRouterGuards(router: Router): void {
     const authStore = useAuthStore()
     const requiresAuth = Boolean(to.meta.requiresAuth)
     const publicOnly = Boolean(to.meta.publicOnly)
+    const adminOnly = Boolean(to.meta.adminOnly)
     const permissions = to.meta.permissions
     const permissionMode = to.meta.permissionMode ?? 'all'
 
@@ -27,6 +28,15 @@ export function registerRouterGuards(router: Router): void {
         path: loginPath,
         query: {
           redirect: to.fullPath,
+        },
+      }
+    }
+
+    if (adminOnly && !authStore.roleCodes.includes('ADMIN')) {
+      return {
+        path: forbiddenPath,
+        query: {
+          from: to.fullPath,
         },
       }
     }
@@ -51,6 +61,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
     publicOnly?: boolean
+    adminOnly?: boolean
     permissions?: string[]
     permissionMode?: PermissionMode
   }

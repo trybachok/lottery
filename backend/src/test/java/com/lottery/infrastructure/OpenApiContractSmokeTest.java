@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 final class OpenApiContractSmokeTest {
@@ -97,6 +98,47 @@ final class OpenApiContractSmokeTest {
                 .contains("$ref: '#/components/parameters/LimitQuery'"));
         assertTrue(section(openApi, "  /admin/permissions:", "    post:")
                 .contains("$ref: '#/components/parameters/OffsetQuery'"));
+    }
+
+    @Test
+    void documentedOperationsHaveBusinessTags() throws IOException {
+        String openApi = openApi();
+        Set<String> expectedTags = Set.of(
+                "System",
+                "Authentication",
+                "Users",
+                "Draws",
+                "Tickets",
+                "Payments",
+                "Reports",
+                "Audit",
+                "Admin Users",
+                "Admin RBAC",
+                "Admin Draws");
+
+        for (String tag : expectedTags) {
+            assertTrue(openApi.contains("  - name: " + tag), "Missing top-level tag: " + tag);
+        }
+
+        String[] lines = openApi.split("\\R");
+        for (int index = 0; index < lines.length; index++) {
+            if (lines[index].matches("    (get|post|put|patch|delete):")) {
+                String nextLine = lines[index + 1];
+                assertTrue(nextLine.startsWith("      tags: ["), "Operation must have explicit tag: " + lines[index]);
+                assertFalse(nextLine.contains("default"), "OpenAPI must not use default tag: " + lines[index]);
+            }
+        }
+    }
+
+    @Test
+    void openApiDocumentEndpointIsAdminProtected() throws IOException {
+        String openApi = openApi();
+        String openApiSection = section(openApi, "  /openapi.yaml:", "  /auth/register:");
+
+        assertTrue(openApiSection.contains("security:"));
+        assertTrue(openApiSection.contains("- bearerAuth: []"));
+        assertTrue(openApiSection.contains("'401':"));
+        assertTrue(openApiSection.contains("'403':"));
     }
 
     @Test

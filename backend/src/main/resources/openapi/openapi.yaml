@@ -4,11 +4,37 @@ info:
   version: 0.1.0
 servers:
   - url: /api/v1
+tags:
+  - name: System
+    description: Service metadata and contract endpoints.
+  - name: Authentication
+    description: Registration and password login.
+  - name: Users
+    description: Public user creation APIs.
+  - name: Draws
+    description: Draw lifecycle, execution and result APIs.
+  - name: Tickets
+    description: Ticket purchase, ownership and result APIs.
+  - name: Payments
+    description: Invoices, payments, refunds and provider webhooks.
+  - name: Reports
+    description: Operational reports and exports.
+  - name: Audit
+    description: Audit log inspection.
+  - name: Admin Users
+    description: Administrative user management.
+  - name: Admin RBAC
+    description: Administrative roles, permissions and assignments.
+  - name: Admin Draws
+    description: Administrative draw ownership actions.
 paths:
   /openapi.yaml:
     get:
+      tags: [System]
       operationId: getOpenApiSpec
       summary: Get OpenAPI document
+      security:
+        - bearerAuth: []
       responses:
         '200':
           description: OpenAPI YAML document
@@ -16,8 +42,13 @@ paths:
             application/yaml:
               schema:
                 type: string
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
   /auth/register:
     post:
+      tags: [Authentication]
       operationId: registerUser
       summary: Register client user
       responses:
@@ -39,6 +70,7 @@ paths:
               $ref: '#/components/schemas/RegisterRequest'
   /auth/login:
     post:
+      tags: [Authentication]
       operationId: loginByPassword
       summary: Login by password
       responses:
@@ -60,6 +92,7 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
   /users:
     post:
+      tags: [Users]
       operationId: createUser
       summary: Create user
       security:
@@ -87,6 +120,7 @@ paths:
               $ref: '#/components/schemas/CreateUserRequest'
   /draws:
     get:
+      tags: [Draws]
       operationId: getDraws
       summary: Get draws list
       security:
@@ -117,6 +151,7 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
     post:
+      tags: [Draws]
       operationId: createDraw
       summary: Create draw
       security:
@@ -142,6 +177,7 @@ paths:
               $ref: '#/components/schemas/CreateDrawRequest'
   /draws/{drawId}:
     get:
+      tags: [Draws]
       operationId: getDrawById
       summary: Get draw by id
       security:
@@ -162,6 +198,7 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
     patch:
+      tags: [Draws]
       operationId: updateDraw
       summary: Update draw
       security:
@@ -193,6 +230,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/activate:
     post:
+      tags: [Draws]
       operationId: activateDraw
       summary: Activate draw
       security:
@@ -216,6 +254,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/pause:
     post:
+      tags: [Draws]
       operationId: pauseDraw
       summary: Pause draw
       security:
@@ -239,6 +278,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/postpone:
     post:
+      tags: [Draws]
       operationId: postponeDraw
       summary: Postpone draw
       security:
@@ -262,6 +302,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/close-sales:
     post:
+      tags: [Draws]
       operationId: closeDrawSales
       summary: Close draw sales
       security:
@@ -285,6 +326,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/cancel:
     post:
+      tags: [Draws]
       operationId: cancelDraw
       summary: Cancel draw
       security:
@@ -308,6 +350,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/archive:
     post:
+      tags: [Draws]
       operationId: archiveDraw
       summary: Archive draw
       security:
@@ -331,6 +374,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/run:
     post:
+      tags: [Draws]
       operationId: runDraw
       summary: Run draw
       security:
@@ -361,6 +405,7 @@ paths:
           $ref: '#/components/responses/Error'
   /draws/{drawId}/result:
     get:
+      tags: [Draws]
       operationId: getDrawResult
       summary: Get draw result
       security:
@@ -382,6 +427,7 @@ paths:
           $ref: '#/components/responses/Error'
   /tickets:
     get:
+      tags: [Tickets]
       operationId: getTickets
       summary: Get tickets list
       security:
@@ -417,6 +463,7 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
     post:
+      tags: [Tickets]
       operationId: createTicket
       summary: Create ticket
       security:
@@ -444,6 +491,7 @@ paths:
               $ref: '#/components/schemas/CreateTicketRequest'
   /tickets/bulk:
     post:
+      tags: [Tickets]
       operationId: bulkCreateTickets
       summary: Bulk create tickets
       security:
@@ -473,6 +521,7 @@ paths:
               $ref: '#/components/schemas/BulkCreateTicketsRequest'
   /tickets/{ticketId}:
     get:
+      tags: [Tickets]
       operationId: getTicketById
       summary: Get ticket by id
       security:
@@ -493,6 +542,7 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
     delete:
+      tags: [Tickets]
       operationId: deleteTicket
       summary: Soft delete ticket
       security:
@@ -512,6 +562,7 @@ paths:
           $ref: '#/components/responses/Error'
   /tickets/{ticketId}/check:
     post:
+      tags: [Tickets]
       operationId: checkTicketResult
       summary: Check ticket result
       security:
@@ -535,6 +586,7 @@ paths:
           $ref: '#/components/responses/Error'
   /tickets/{ticketId}/cancel:
     post:
+      tags: [Tickets]
       operationId: cancelTicket
       summary: Cancel ticket
       security:
@@ -558,6 +610,7 @@ paths:
           $ref: '#/components/responses/Error'
   /tickets/{ticketId}/invoice:
     get:
+      tags: [Payments]
       operationId: getTicketInvoice
       summary: Get latest payment invoice for ticket
       security:
@@ -578,6 +631,7 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
     post:
+      tags: [Payments]
       operationId: createInvoiceForTicket
       summary: Create payment invoice for ticket
       security:
@@ -609,6 +663,7 @@ paths:
               $ref: '#/components/schemas/CreateInvoiceRequest'
   /invoices/{invoiceId}:
     get:
+      tags: [Payments]
       operationId: getInvoiceById
       summary: Get invoice by id
       security:
@@ -635,6 +690,7 @@ paths:
           $ref: '#/components/responses/Error'
   /invoices/{invoiceId}/cancel:
     post:
+      tags: [Payments]
       operationId: cancelInvoice
       summary: Cancel active invoice
       security:
@@ -671,6 +727,7 @@ paths:
               $ref: '#/components/schemas/CancelInvoiceRequest'
   /invoices/{invoiceId}/expire:
     post:
+      tags: [Payments]
       operationId: expireInvoice
       summary: Expire active invoice after expiration time
       security:
@@ -699,6 +756,7 @@ paths:
           $ref: '#/components/responses/Error'
   /payments/{paymentId}/refund:
     post:
+      tags: [Payments]
       operationId: refundPayment
       summary: Request refund for captured payment
       security:
@@ -735,6 +793,7 @@ paths:
               $ref: '#/components/schemas/RefundPaymentRequest'
   /payment-providers/{providerCode}/webhook:
     post:
+      tags: [Payments]
       operationId: processPaymentWebhook
       summary: Process signed payment provider webhook
       parameters:
@@ -769,6 +828,7 @@ paths:
               $ref: '#/components/schemas/PaymentWebhookPayload'
   /reports/draws:
     get:
+      tags: [Reports]
       operationId: getDrawReport
       summary: Get draws report
       security:
@@ -794,6 +854,7 @@ paths:
           $ref: '#/components/responses/Error'
   /reports/tickets:
     get:
+      tags: [Reports]
       operationId: getTicketReport
       summary: Get tickets report
       security:
@@ -819,6 +880,7 @@ paths:
           $ref: '#/components/responses/Error'
   /reports/draws/export:
     get:
+      tags: [Reports]
       operationId: exportDrawReport
       summary: Export draws report
       security:
@@ -848,6 +910,7 @@ paths:
           $ref: '#/components/responses/Error'
   /reports/tickets/export:
     get:
+      tags: [Reports]
       operationId: exportTicketReport
       summary: Export tickets report
       security:
@@ -877,6 +940,7 @@ paths:
           $ref: '#/components/responses/Error'
   /admin/audit-logs:
     get:
+      tags: [Audit]
       operationId: getAuditLogs
       summary: Get audit logs
       security:
@@ -913,6 +977,7 @@ paths:
           $ref: '#/components/responses/Error'
   /admin/users:
     get:
+      tags: [Admin Users]
       operationId: adminListUsers
       summary: Admin list users
       security:
@@ -932,6 +997,7 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
     post:
+      tags: [Admin Users]
       operationId: adminCreateUser
       summary: Admin create user
       security:
@@ -957,6 +1023,7 @@ paths:
           $ref: '#/components/responses/Error'
   /admin/users/{userId}:
     get:
+      tags: [Admin Users]
       operationId: adminGetUser
       summary: Admin get user
       security:
@@ -973,6 +1040,7 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
     put:
+      tags: [Admin Users]
       operationId: adminUpdateUser
       summary: Admin update user
       security:
@@ -993,6 +1061,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
     delete:
+      tags: [Admin Users]
       operationId: adminDeleteUser
       summary: Admin delete user
       security:
@@ -1004,6 +1073,7 @@ paths:
           description: User deleted
   /admin/users/{userId}/roles:
     get:
+      tags: [Admin Users]
       operationId: adminListUserRoles
       summary: Admin list user roles
       security:
@@ -1018,6 +1088,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RoleListResponse'
     post:
+      tags: [Admin Users]
       operationId: adminAssignUserRole
       summary: Admin assign role to user
       security:
@@ -1035,6 +1106,7 @@ paths:
           description: Role assigned
   /admin/users/{userId}/roles/{roleId}:
     delete:
+      tags: [Admin Users]
       operationId: adminRemoveUserRole
       summary: Admin remove role from user
       security:
@@ -1047,6 +1119,7 @@ paths:
           description: Role removed
   /admin/roles:
     get:
+      tags: [Admin RBAC]
       operationId: adminListRoles
       summary: Admin list roles
       security:
@@ -1062,6 +1135,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RoleListResponse'
     post:
+      tags: [Admin RBAC]
       operationId: adminCreateRole
       summary: Admin create role
       security:
@@ -1081,6 +1155,7 @@ paths:
                 $ref: '#/components/schemas/Role'
   /admin/roles/{roleId}:
     get:
+      tags: [Admin RBAC]
       operationId: adminGetRole
       summary: Admin get role
       security:
@@ -1095,6 +1170,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Role'
     put:
+      tags: [Admin RBAC]
       operationId: adminUpdateRole
       summary: Admin update role
       security:
@@ -1115,6 +1191,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Role'
     delete:
+      tags: [Admin RBAC]
       operationId: adminDeleteRole
       summary: Admin delete role
       security:
@@ -1126,6 +1203,7 @@ paths:
           description: Role deleted
   /admin/roles/{roleId}/permissions:
     get:
+      tags: [Admin RBAC]
       operationId: adminListRolePermissions
       summary: Admin list role permissions
       security:
@@ -1140,6 +1218,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PermissionListResponse'
     post:
+      tags: [Admin RBAC]
       operationId: adminAssignRolePermission
       summary: Admin assign permission to role
       security:
@@ -1157,6 +1236,7 @@ paths:
           description: Permission assigned
   /admin/roles/{roleId}/permissions/{permissionId}:
     delete:
+      tags: [Admin RBAC]
       operationId: adminRemoveRolePermission
       summary: Admin remove permission from role
       security:
@@ -1169,6 +1249,7 @@ paths:
           description: Permission removed
   /admin/permissions:
     get:
+      tags: [Admin RBAC]
       operationId: adminListPermissions
       summary: Admin list permissions
       security:
@@ -1184,6 +1265,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PermissionListResponse'
     post:
+      tags: [Admin RBAC]
       operationId: adminCreatePermission
       summary: Admin create permission
       security:
@@ -1203,6 +1285,7 @@ paths:
                 $ref: '#/components/schemas/Permission'
   /admin/permissions/{permissionId}:
     get:
+      tags: [Admin RBAC]
       operationId: adminGetPermission
       summary: Admin get permission
       security:
@@ -1217,6 +1300,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Permission'
     put:
+      tags: [Admin RBAC]
       operationId: adminUpdatePermission
       summary: Admin update permission
       security:
@@ -1237,6 +1321,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Permission'
     delete:
+      tags: [Admin RBAC]
       operationId: adminDeletePermission
       summary: Admin delete permission
       security:
@@ -1248,6 +1333,7 @@ paths:
           description: Permission deleted
   /admin/draws/{drawId}/assign-manager:
     post:
+      tags: [Admin Draws]
       operationId: adminAssignDrawManager
       summary: Admin assign manager to draw
       security:

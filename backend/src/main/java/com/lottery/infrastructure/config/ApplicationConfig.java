@@ -33,6 +33,7 @@ import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
 import com.lottery.application.usecase.report.GenerateDrawReportUseCase;
 import com.lottery.application.usecase.report.GenerateTicketReportUseCase;
+import com.lottery.application.usecase.system.GetOpenApiDocumentUseCase;
 import com.lottery.application.usecase.ticket.BulkCreateTicketsUseCase;
 import com.lottery.application.usecase.ticket.CancelTicketUseCase;
 import com.lottery.application.usecase.ticket.CheckTicketResultUseCase;
@@ -356,6 +357,10 @@ public final class ApplicationConfig {
                 clock,
                 new DrawMapper(),
                 auditService);
+        GetOpenApiDocumentUseCase getOpenApiDocumentUseCase = new GetOpenApiDocumentUseCase(
+                new OpenApiResource(),
+                authorizationPort,
+                transactionManager);
 
         ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService, rbacRepository);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
@@ -364,7 +369,13 @@ public final class ApplicationConfig {
         context.addFilter(new FilterHolder(new RequestContextFilter()), "/*", EnumSet.of(DispatcherType.REQUEST));
         context.addServlet(new ServletHolder(new HealthServlet(objectMapper, errorHandler)), "/health");
         context.addServlet(new ServletHolder(new ReadyServlet(objectMapper, errorHandler, dataSource)), "/ready");
-        context.addServlet(new ServletHolder(new OpenApiServlet(new OpenApiResource())), "/api/v1/openapi.yaml");
+        context.addServlet(
+                new ServletHolder(new OpenApiServlet(
+                        objectMapper,
+                        errorHandler,
+                        getOpenApiDocumentUseCase,
+                        contextFactory)),
+                "/api/v1/openapi.yaml");
         context.addServlet(
                 new ServletHolder(new RegisterServlet(objectMapper, errorHandler, registerUserUseCase)),
                 "/api/v1/auth/register");

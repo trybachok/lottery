@@ -23,6 +23,14 @@ const routes: RouteRecordRaw[] = [
         },
     },
     {
+        path: '/docs',
+        component: () => import('@/pages/public/ApiDocsPage.vue'),
+        meta: {
+            requiresAuth: true,
+            adminOnly: true,
+        },
+    },
+    {
         path: '/draws',
         component: () => import('@/pages/public/DrawsPage.vue'),
         meta: {

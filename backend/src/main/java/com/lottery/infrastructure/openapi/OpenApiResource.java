@@ -1,10 +1,12 @@
 package com.lottery.infrastructure.openapi;
 
+import com.lottery.application.port.openapi.OpenApiDocumentPort;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-public final class OpenApiResource {
+public final class OpenApiResource implements OpenApiDocumentPort {
+    @Override
     public String load() {
         try (InputStream inputStream = getClass().getResourceAsStream("/openapi/openapi.yaml")) {
             if (inputStream == null) {

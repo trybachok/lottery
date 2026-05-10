@@ -158,6 +158,7 @@ public final class ApplicationConfig {
         PasswordHasher passwordHasher = new BcryptPasswordHasher(properties.bcryptCost());
         HmacTokenService tokenService = new HmacTokenService(properties.accessTokenSecret(), properties.accessTokenTtlSeconds());
         MockPaymentProviderAdapter paymentProvider = new MockPaymentProviderAdapter(properties.mockPaymentWebhookSecret());
+        JsonCombinationEngine combinationEngine = new JsonCombinationEngine(objectMapper);
 
         CreateUserUseCase createUserUseCase = new CreateUserUseCase(
                 userRepository,
@@ -183,8 +184,10 @@ public final class ApplicationConfig {
                 new UserMapper());
         CreateDrawUseCase createDrawUseCase = new CreateDrawUseCase(
                 drawRepository,
+                combinationSchemaRepository,
                 authorizationPort,
                 transactionManager,
+                combinationEngine,
                 clock,
                 new DrawMapper(),
                 auditService);
@@ -214,7 +217,6 @@ public final class ApplicationConfig {
                 clock,
                 new DrawMapper(),
                 auditService);
-        JsonCombinationEngine combinationEngine = new JsonCombinationEngine(objectMapper);
         GenerateWinningCombinationUseCase generateWinningCombinationUseCase = new GenerateWinningCombinationUseCase(
                 drawRepository,
                 combinationSchemaRepository,

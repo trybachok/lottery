@@ -9,6 +9,7 @@ public record CreateDrawCommand(
         String description,
         UUID managerId,
         UUID combinationSchemaId,
+        CreateCombinationSchemaCommand combinationSchema,
         Instant salesStartAt,
         Instant salesEndAt,
         Instant drawAt,
@@ -16,9 +17,14 @@ public record CreateDrawCommand(
         boolean test) {
     public CreateDrawCommand {
         Objects.requireNonNull(title, "title");
-        Objects.requireNonNull(combinationSchemaId, "combinationSchemaId");
         Objects.requireNonNull(salesStartAt, "salesStartAt");
         Objects.requireNonNull(salesEndAt, "salesEndAt");
         Objects.requireNonNull(drawAt, "drawAt");
+        if (combinationSchemaId == null && combinationSchema == null) {
+            throw new IllegalArgumentException("Either combinationSchemaId or combinationSchema is required");
+        }
+        if (combinationSchemaId != null && combinationSchema != null) {
+            throw new IllegalArgumentException("Use either combinationSchemaId or combinationSchema, not both");
+        }
     }
 }

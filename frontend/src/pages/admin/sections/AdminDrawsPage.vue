@@ -32,11 +32,13 @@ async function createDraw(request: CreateDrawRequest): Promise<void> {
     <BaseCard
       v-if="canCreateDraw"
       title="Create draw"
-      description="Create a draw from an existing combination schema."
+      description="Create a draw and prepare its combination schema."
     >
       <AdminDrawCreateForm
         :loading="adminDrawsStore.isCreating"
         :error-message="adminDrawsStore.actionError?.message"
+        :can-assign-manager="isAdmin"
+        :default-manager-id="authStore.user?.id"
         @submit="createDraw"
       />
     </BaseCard>

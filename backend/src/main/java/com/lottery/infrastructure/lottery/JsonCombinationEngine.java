@@ -3,6 +3,7 @@ package com.lottery.infrastructure.lottery;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.port.lottery.CombinationEvaluatorPort;
+import com.lottery.application.port.lottery.CombinationSchemaValidatorPort;
 import com.lottery.application.port.lottery.CombinationValidatorPort;
 import com.lottery.application.port.lottery.WinningCombinationGeneratorPort;
 import com.lottery.domain.model.CombinationSchema;
@@ -21,7 +22,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public final class JsonCombinationEngine implements WinningCombinationGeneratorPort, CombinationEvaluatorPort, CombinationValidatorPort {
+public final class JsonCombinationEngine implements
+        WinningCombinationGeneratorPort,
+        CombinationEvaluatorPort,
+        CombinationValidatorPort,
+        CombinationSchemaValidatorPort {
     private static final String ALGORITHM_VERSION = "json-schema-secure-random-v1";
     private static final String RANDOM_PROVIDER = "SecureRandom";
 
@@ -61,6 +66,29 @@ public final class JsonCombinationEngine implements WinningCombinationGeneratorP
                     proofHash(schema.id() + ":" + String.join("|", values) + ":" + Instant.now()));
         } catch (Exception exception) {
             throw new IllegalArgumentException("Failed to generate winning combination", exception);
+        }
+    }
+
+    @Override
+    public void validateSchema(CombinationSchema schema) {
+        try {
+            JsonNode root = objectMapper.readTree(schema.definition().document());
+            if (root == null || !root.isObject()) {
+                throw new IllegalArgumentException("Combination schema must be a JSON object");
+            }
+            validateBoolean(root, "allowDuplicates");
+            validateBoolean(root, "orderSensitive");
+            JsonNode positions = root.path("positions");
+            if (!positions.isArray() || positions.isEmpty()) {
+                throw new IllegalArgumentException("Combination schema positions must be a non-empty array");
+            }
+            for (JsonNode position : positions) {
+                validatePosition(position);
+            }
+        } catch (IllegalArgumentException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Failed to validate combination schema", exception);
         }
     }
 
@@ -110,6 +138,44 @@ public final class JsonCombinationEngine implements WinningCombinationGeneratorP
         }
     }
 
+    private void validatePosition(JsonNode position) {
+        if (!position.isObject()) {
+            throw new IllegalArgumentException("Combination schema position must be an object");
+        }
+        String type = position.path("type").asText();
+        switch (type) {
+            case "NUMBER" -> {
+                validateInteger(position, "min");
+                validateInteger(position, "max");
+                int min = position.path("min").asInt(1);
+                int max = position.path("max").asInt(99);
+                if (max < min) {
+                    throw new IllegalArgumentException("NUMBER position max must be >= min");
+                }
+            }
+            case "LETTER" -> {
+                JsonNode alphabet = position.path("alphabet");
+                if (!alphabet.isMissingNode() && !alphabet.isTextual()) {
+                    throw new IllegalArgumentException("LETTER alphabet must be a string");
+                }
+                if (!alphabet.isMissingNode()
+                        && !"unicode".equalsIgnoreCase(alphabet.asText())
+                        && alphabet.asText().isBlank()) {
+                    throw new IllegalArgumentException("LETTER alphabet must not be blank");
+                }
+            }
+            case "EMOJI", "TEXT" -> {
+            }
+            case "IMAGE" -> {
+                JsonNode assetGroupId = position.path("allowedAssetGroupId");
+                if (!assetGroupId.isMissingNode() && !assetGroupId.isTextual()) {
+                    throw new IllegalArgumentException("IMAGE allowedAssetGroupId must be a string");
+                }
+            }
+            default -> throw new IllegalArgumentException("Unsupported combination position type: " + type);
+        }
+    }
+
     private void validateValue(String value, JsonNode position) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException("Combination value must not be blank");
@@ -144,6 +210,20 @@ public final class JsonCombinationEngine implements WinningCombinationGeneratorP
             case "EMOJI", "TEXT", "IMAGE" -> {
             }
             default -> throw new IllegalArgumentException("Unsupported combination position type: " + type);
+        }
+    }
+
+    private void validateBoolean(JsonNode root, String field) {
+        JsonNode value = root.path(field);
+        if (!value.isMissingNode() && !value.isBoolean()) {
+            throw new IllegalArgumentException(field + " must be a boolean");
+        }
+    }
+
+    private void validateInteger(JsonNode root, String field) {
+        JsonNode value = root.path(field);
+        if (!value.isMissingNode() && !value.canConvertToInt()) {
+            throw new IllegalArgumentException(field + " must be an integer");
         }
     }
 

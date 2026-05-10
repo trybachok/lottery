@@ -13,6 +13,7 @@ Docker-инфраструктуру для локального запуска.
 - клиентские сценарии просмотра розыгрышей, покупки билетов, просмотра билетов, invoice/payment статусов и результатов;
 - управление пользователями, ролями и permissions в админ-панели;
 - управление розыгрышами и назначение менеджера;
+- подготовка схемы комбинации при создании розыгрыша в UI;
 - создание билетов и bulk-создание билетов через API;
 - invoice/payment/refund/webhook flows через mock payment provider;
 - отдельная генерация выигрышной комбинации для тиража;
@@ -212,7 +213,7 @@ http://127.0.0.1:8090/admin
 - `Users` - управление пользователями;
 - `Roles` - управление ролями;
 - `Permissions` - управление permissions;
-- `Draws` - создание и управление розыгрышами, назначение менеджера, генерация выигрышной комбинации и запуск розыгрыша;
+- `Draws` - создание и управление розыгрышами, подготовка схемы комбинации, назначение менеджера, генерация выигрышной комбинации и запуск розыгрыша;
 - `Reports` - отчеты по розыгрышам и билетам;
 - `Audit` - аудит действий;
 - `Settings` - настройки Home page;
@@ -482,8 +483,22 @@ echo "$CLIENT_USER_ID"
 
 ## 4. Подготовить схему комбинации
 
-В UI пока нет отдельного экрана для создания схемы комбинации, поэтому добавим её напрямую в БД.
-Backend уже умеет использовать эту схему при генерации выигрышной комбинации:
+Схема комбинации создается в пользовательском интерфейсе в форме создания тиража:
+
+```text
+/admin/draws -> Create draw -> Combination schema -> Create new
+```
+
+Backend сохраняет схему в таблицу `combination_schemas` и привязывает её к новому тиражу в одной транзакции.
+
+RBAC:
+
+- `ADMIN` может создать тираж и указать любого менеджера;
+- `MANAGER` может создать тираж только для себя, после чего он становится менеджером этого тиража;
+- другой менеджер не получает доступ к чужому тиражу;
+- `CLIENT` не имеет доступа к созданию тиражей и схем.
+
+Схема используется backend при генерации выигрышной комбинации:
 
 - `positions` описывает количество и тип позиций в комбинации;
 - `allowDuplicates: false` запрещает повтор значений в одной комбинации;
@@ -498,41 +513,6 @@ Backend уже умеет использовать эту схему при ге
 
 С `allowDuplicates: false` выигрышная комбинация всегда будет либо `7,1`, либо `7,2`.
 Дальше в сценарии мы создадим два билета с этими комбинациями, поэтому один билет гарантированно станет `WIN`, а второй `LOSE`.
-
-```bash
-export COMBINATION_SCHEMA_ID="11111111-1111-1111-1111-111111111111"
-
-docker compose --env-file .env.example exec -T postgres psql -U lottery -d lottery <<SQL
-insert into combination_schemas (
-  id,
-  name,
-  schema_json,
-  created_at
-)
-values (
-  '$COMBINATION_SCHEMA_ID',
-  'Demo schema: 7 + 1..2',
-  '{
-    "positions": [
-      {
-        "type": "NUMBER",
-        "min": 7,
-        "max": 7
-      },
-      {
-        "type": "NUMBER",
-        "min": 1,
-        "max": 2
-      }
-    ],
-    "allowDuplicates": false,
-    "orderSensitive": true
-  }'::jsonb,
-  now()
-)
-on conflict (id) do nothing;
-SQL
-```
 
 ---
 
@@ -575,7 +555,10 @@ DRAW_RESPONSE=$(curl -s -X POST "$BASE/draws" \
   -d "{
     \"title\": \"Demo basic lottery\",
     \"description\": \"Basic lifecycle demo draw\",
-    \"combinationSchemaId\": \"$COMBINATION_SCHEMA_ID\",
+    \"combinationSchema\": {
+      \"name\": \"Demo schema: 7 + 1..2\",
+      \"definitionJson\": \"{\\\"positions\\\":[{\\\"type\\\":\\\"NUMBER\\\",\\\"min\\\":7,\\\"max\\\":7},{\\\"type\\\":\\\"NUMBER\\\",\\\"min\\\":1,\\\"max\\\":2}],\\\"allowDuplicates\\\":false,\\\"orderSensitive\\\":true}\"
+    },
     \"salesStartAt\": \"$SALES_START_AT\",
     \"salesEndAt\": \"$SALES_END_AT\",
     \"drawAt\": \"$DRAW_AT\",
@@ -586,7 +569,9 @@ DRAW_RESPONSE=$(curl -s -X POST "$BASE/draws" \
 echo "$DRAW_RESPONSE" | jq
 
 export DRAW_ID=$(echo "$DRAW_RESPONSE" | jq -r '.id')
+export COMBINATION_SCHEMA_ID=$(echo "$DRAW_RESPONSE" | jq -r '.combinationSchemaId')
 echo "$DRAW_ID"
+echo "$COMBINATION_SCHEMA_ID"
 ```
 
 После создания обычный тираж получает статус:
@@ -1185,7 +1170,9 @@ http://127.0.0.1:8090/admin/draws
 
 ```text
 title: Demo basic lottery
-combinationSchemaId: 11111111-1111-1111-1111-111111111111
+Combination schema: Create new
+Schema name: Demo schema: 7 + 1..2
+Schema JSON: демо-схема из шага 4
 salesStartAt: текущее время или раньше
 salesEndAt: время в будущем
 drawAt: время после salesEndAt
@@ -2391,7 +2378,7 @@ http://127.0.0.1:8090/admin/draws
 
 ```text id="9dm6qi"
 1. Нажать форму создания тиража.
-2. Заполнить title, description, combinationSchemaId, salesStartAt, salesEndAt, drawAt, maxTickets.
+2. Заполнить title, description, Combination schema, salesStartAt, salesEndAt, drawAt, maxTickets.
 3. Создать тираж.
 ```
 

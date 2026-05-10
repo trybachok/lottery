@@ -176,6 +176,7 @@ paths:
       tags: [Draws]
       operationId: createDraw
       summary: Create draw
+      description: Creates a draw from an existing combination schema or creates a new schema and attaches it to the draw in one operation.
       security:
         - bearerAuth: []
       responses:
@@ -2074,7 +2075,7 @@ components:
           format: int64
     CreateDrawRequest:
       type: object
-      required: [title, combinationSchemaId, salesStartAt, salesEndAt, drawAt]
+      required: [title, salesStartAt, salesEndAt, drawAt]
       properties:
         title:
           type: string
@@ -2086,6 +2087,9 @@ components:
         combinationSchemaId:
           type: string
           format: uuid
+          description: Existing combination schema id. Use either combinationSchemaId or combinationSchema.
+        combinationSchema:
+          $ref: '#/components/schemas/CreateCombinationSchemaRequest'
         salesStartAt:
           type: string
           format: date-time
@@ -2101,6 +2105,25 @@ components:
         test:
           type: boolean
           default: false
+    CreateCombinationSchemaRequest:
+      type: object
+      required: [name, definitionJson]
+      properties:
+        name:
+          type: string
+          maxLength: 128
+        definitionJson:
+          type: string
+          description: JSON object with positions, allowDuplicates, and orderSensitive.
+          example: |
+            {
+              "positions": [
+                { "type": "NUMBER", "min": 7, "max": 7 },
+                { "type": "NUMBER", "min": 1, "max": 2 }
+              ],
+              "allowDuplicates": false,
+              "orderSensitive": true
+            }
     UpdateDrawRequest:
       type: object
       properties:

@@ -172,12 +172,22 @@ final class RunDrawUseCaseTest {
             losingPayment = capturedPayment(losingInvoice);
             invoices = new InMemoryInvoiceRepository(List.of(winningInvoice, losingInvoice));
             payments = new InMemoryPaymentRepository(List.of(winningPayment, losingPayment));
-            CombinationSchemaRepository schemas = id -> Optional.of(new CombinationSchema(
-                    schemaId,
-                    "numbers",
-                    new CombinationSchemaDefinition(
-                            "{\"positions\":[{\"type\":\"NUMBER\"},{\"type\":\"NUMBER\"}],\"orderSensitive\":true}"),
-                    NOW));
+            CombinationSchemaRepository schemas = new CombinationSchemaRepository() {
+                @Override
+                public CombinationSchema save(CombinationSchema schema) {
+                    return schema;
+                }
+
+                @Override
+                public Optional<CombinationSchema> findById(UUID id) {
+                    return Optional.of(new CombinationSchema(
+                            schemaId,
+                            "numbers",
+                            new CombinationSchemaDefinition(
+                                    "{\"positions\":[{\"type\":\"NUMBER\"},{\"type\":\"NUMBER\"}],\"orderSensitive\":true}"),
+                            NOW));
+                }
+            };
             WinningCombinationGeneratorPort generator = schema -> new WinningCombinationGeneratorPort.GeneratedWinningCombination(
                     new Combination(List.of("1", "2")),
                     "test",

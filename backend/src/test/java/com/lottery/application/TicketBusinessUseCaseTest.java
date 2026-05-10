@@ -332,6 +332,11 @@ final class TicketBusinessUseCaseTest {
         }
 
         @Override
+        public CombinationSchema save(CombinationSchema schema) {
+            return schema;
+        }
+
+        @Override
         public Optional<CombinationSchema> findById(UUID id) {
             return schemaId.equals(id)
                     ? Optional.of(new CombinationSchema(id, "schema", new CombinationSchemaDefinition("{\"positions\":[]}"), NOW))

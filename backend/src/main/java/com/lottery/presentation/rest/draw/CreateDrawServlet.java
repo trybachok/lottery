@@ -1,6 +1,7 @@
 package com.lottery.presentation.rest.draw;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lottery.application.command.CreateCombinationSchemaCommand;
 import com.lottery.application.command.CreateDrawCommand;
 import com.lottery.application.dto.DrawDto;
 import com.lottery.application.query.ListDrawsQuery;
@@ -55,6 +56,11 @@ public final class CreateDrawServlet extends JsonServlet {
                             body.description(),
                             body.managerId(),
                             body.combinationSchemaId(),
+                            body.combinationSchema() == null
+                                    ? null
+                                    : new CreateCombinationSchemaCommand(
+                                            body.combinationSchema().name(),
+                                            body.combinationSchema().definitionJson()),
                             body.salesStartAt(),
                             body.salesEndAt(),
                             body.drawAt(),
@@ -72,11 +78,15 @@ public final class CreateDrawServlet extends JsonServlet {
             String description,
             UUID managerId,
             UUID combinationSchemaId,
+            CombinationSchemaRequest combinationSchema,
             Instant salesStartAt,
             Instant salesEndAt,
             Instant drawAt,
             Integer maxTickets,
             boolean test) {
+    }
+
+    public record CombinationSchemaRequest(String name, String definitionJson) {
     }
 
     public record DrawListResponse(List<DrawDto> items) {

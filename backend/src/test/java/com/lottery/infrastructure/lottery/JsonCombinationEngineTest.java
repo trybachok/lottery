@@ -1,6 +1,7 @@
 package com.lottery.infrastructure.lottery;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.domain.model.CombinationSchema;
@@ -31,5 +32,23 @@ final class JsonCombinationEngineTest {
 
         assertEquals(2, generated.combination().values().size());
         assertEquals(2, generated.combination().values().stream().distinct().count());
+    }
+
+    @Test
+    void validatesSchemaBeforeItCanBeSavedFromUi() {
+        JsonCombinationEngine engine = new JsonCombinationEngine(new ObjectMapper());
+        CombinationSchema schema = new CombinationSchema(
+                UUID.randomUUID(),
+                "broken schema",
+                new CombinationSchemaDefinition("""
+                        {
+                          "positions": [
+                            { "type": "NUMBER", "min": 9, "max": 1 }
+                          ]
+                        }
+                        """),
+                Instant.parse("2026-05-01T00:00:00Z"));
+
+        assertThrows(IllegalArgumentException.class, () -> engine.validateSchema(schema));
     }
 }

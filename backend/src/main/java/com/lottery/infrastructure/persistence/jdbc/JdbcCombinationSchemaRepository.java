@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,6 +16,27 @@ public final class JdbcCombinationSchemaRepository implements CombinationSchemaR
 
     public JdbcCombinationSchemaRepository(JdbcConnectionProvider connectionProvider) {
         this.connectionProvider = connectionProvider;
+    }
+
+    @Override
+    public CombinationSchema save(CombinationSchema schema) {
+        String sql = """
+                insert into combination_schemas (id, name, schema_json, created_at)
+                values (?, ?, ?::jsonb, ?)
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, schema.id());
+                statement.setString(2, schema.name());
+                statement.setString(3, schema.definition().document());
+                statement.setTimestamp(4, Timestamp.from(schema.createdAt()));
+                statement.executeUpdate();
+                return schema;
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to save combination schema", exception);
+        }
     }
 
     @Override

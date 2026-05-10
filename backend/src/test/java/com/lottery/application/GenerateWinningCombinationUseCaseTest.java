@@ -115,12 +115,22 @@ final class GenerateWinningCombinationUseCaseTest {
                     null,
                     0);
             draws = new InMemoryDrawRepository(draw);
-            CombinationSchemaRepository schemas = id -> Optional.of(new CombinationSchema(
-                    schemaId,
-                    "numbers",
-                    new CombinationSchemaDefinition(
-                            "{\"positions\":[{\"type\":\"NUMBER\"},{\"type\":\"NUMBER\"}],\"orderSensitive\":true}"),
-                    NOW));
+            CombinationSchemaRepository schemas = new CombinationSchemaRepository() {
+                @Override
+                public CombinationSchema save(CombinationSchema schema) {
+                    return schema;
+                }
+
+                @Override
+                public Optional<CombinationSchema> findById(UUID id) {
+                    return Optional.of(new CombinationSchema(
+                            schemaId,
+                            "numbers",
+                            new CombinationSchemaDefinition(
+                                    "{\"positions\":[{\"type\":\"NUMBER\"},{\"type\":\"NUMBER\"}],\"orderSensitive\":true}"),
+                            NOW));
+                }
+            };
             useCase = new GenerateWinningCombinationUseCase(
                     draws,
                     schemas,

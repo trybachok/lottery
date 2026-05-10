@@ -94,11 +94,15 @@ function isActive(item: AdminNavigationItem): boolean {
 
 .admin-sidebar__link:hover {
   background: var(--color-surface-muted);
-  color: var(--color-text);
+  color: var(--color-surface-muted-text);
 }
 
 .admin-sidebar__link--active {
   background: var(--color-primary-soft);
   color: var(--color-primary);
+}
+
+.admin-sidebar__link--active:hover {
+  color: var(--color-surface-muted-text);
 }
 </style>

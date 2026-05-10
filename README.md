@@ -179,7 +179,8 @@ password: *****
 На Home page:
 
 - отображается шаблон, загруженный из backend;
-- есть header, banner, sidebar, main и footer;
+- используется общая шапка системы;
+- настраиваемый шаблон содержит banner, sidebar, main и footer;
 - можно переключить тему Light/Dark;
 - выбранная тема сохраняется в браузере.
 

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import BaseButton from '@/shared/ui/BaseButton.vue'
 import { useAuthStore } from '@/features/auth/model/auth.store'
+import ThemeSwitcher from '@/features/theme/ui/ThemeSwitcher.vue'
 import { filterSiteNavigation, siteNavigationItems } from './siteNavigation'
 
 const authStore = useAuthStore()
@@ -43,6 +44,7 @@ async function logout(): Promise<void> {
       </nav>
 
       <div class="app-shell__user">
+        <ThemeSwitcher />
         <span v-if="authStore.user" class="app-shell__user-name">{{ authStore.user.login }}</span>
         <BaseButton v-if="authStore.isAuthenticated" variant="secondary" size="sm" @click="logout">Logout</BaseButton>
         <template v-else>
@@ -142,6 +144,7 @@ async function logout(): Promise<void> {
 .app-shell__user {
   justify-content: flex-end;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .app-shell__user-name {

@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Set;
 
 final class HomePageLayoutValidator {
-    private static final Set<String> REQUIRED_REGIONS = Set.of("header", "banner", "sidebar", "main", "footer");
+    private static final Set<String> REQUIRED_REGIONS = Set.of("banner", "sidebar", "main", "footer");
 
     void validate(Map<String, Object> layout) {
         if (layout == null || layout.isEmpty()) {

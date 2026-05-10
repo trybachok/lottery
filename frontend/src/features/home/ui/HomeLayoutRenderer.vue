@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { UiTemplate } from '@/shared/api/generated/types.gen'
-import ThemeSwitcher from './ThemeSwitcher.vue'
 
 type LinkAction = {
   label?: string
@@ -36,7 +35,6 @@ const regions = computed<Record<string, LayoutRegion>>(() => {
   return typeof rawRegions === 'object' && rawRegions !== null ? (rawRegions as Record<string, LayoutRegion>) : {}
 })
 
-const header = computed(() => regions.value.header ?? {})
 const banner = computed(() => regions.value.banner ?? {})
 const sidebar = computed(() => regions.value.sidebar ?? {})
 const main = computed(() => regions.value.main ?? {})
@@ -45,27 +43,6 @@ const footer = computed(() => regions.value.footer ?? {})
 
 <template>
   <div class="home-layout">
-    <header class="home-layout__header">
-      <RouterLink class="home-layout__brand" to="/">
-        <span class="home-layout__brand-mark" aria-hidden="true">L</span>
-        <span>
-          <strong>{{ header.title ?? 'Lottery' }}</strong>
-          <small v-if="header.subtitle">{{ header.subtitle }}</small>
-        </span>
-      </RouterLink>
-      <nav class="home-layout__nav" aria-label="Main">
-        <RouterLink
-          v-for="action in header.actions ?? []"
-          :key="`${action.label}-${action.to}`"
-          :to="action.to ?? '/'"
-          class="home-layout__nav-link"
-        >
-          {{ action.label }}
-        </RouterLink>
-        <ThemeSwitcher />
-      </nav>
-    </header>
-
     <section class="home-layout__banner">
       <div>
         <p class="home-layout__eyebrow">{{ template.name }}</p>
@@ -109,72 +86,16 @@ const footer = computed(() => regions.value.footer ?? {})
 
 <style scoped>
 .home-layout {
-  min-height: 100vh;
+  min-height: 100%;
   background: var(--color-bg);
   color: var(--color-text);
 }
 
-.home-layout__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-  padding: 18px clamp(18px, 5vw, 64px);
-}
-
-.home-layout__brand,
-.home-layout__nav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.home-layout__brand {
-  min-width: 0;
-  color: inherit;
-  text-decoration: none;
-}
-
-.home-layout__brand strong,
-.home-layout__brand small {
-  display: block;
-}
-
-.home-layout__brand small {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.35;
-}
-
-.home-layout__brand-mark {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-primary-text, #fff);
-  font-weight: 800;
-}
-
-.home-layout__nav {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.home-layout__nav-link,
 .home-layout__button,
 .home-layout__side-link {
   color: inherit;
   font-weight: 650;
   text-decoration: none;
-}
-
-.home-layout__nav-link {
-  color: var(--color-text-muted);
 }
 
 .home-layout__banner {
@@ -278,14 +199,9 @@ const footer = computed(() => regions.value.footer ?? {})
 }
 
 @media (max-width: 760px) {
-  .home-layout__header,
   .home-layout__banner {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .home-layout__nav {
-    justify-content: flex-start;
   }
 
   .home-layout__content {

@@ -51,15 +51,6 @@ values (
     '{
         "version": 1,
         "regions": {
-            "header": {
-                "type": "header",
-                "title": "Lottery",
-                "subtitle": "Онлайн-лотерея с прозрачными розыгрышами",
-                "actions": [
-                    { "label": "Розыгрыши", "to": "/draws" },
-                    { "label": "Войти", "to": "/login" }
-                ]
-            },
             "banner": {
                 "type": "banner",
                 "title": "Проверь удачу в ближайшем розыгрыше",

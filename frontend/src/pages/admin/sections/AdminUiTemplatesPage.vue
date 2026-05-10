@@ -76,7 +76,6 @@ function defaultLayoutJson(): string {
     {
       version: 1,
       regions: {
-        header: { type: 'header', title: 'Lottery', actions: [{ label: 'Draws', to: '/draws' }] },
         banner: { type: 'banner', title: 'Welcome', subtitle: 'Configurable home page.' },
         sidebar: { type: 'sidebar', title: 'Menu', blocks: [{ type: 'link', label: 'Tickets', to: '/tickets' }] },
         main: { type: 'main', title: 'Home', blocks: [{ type: 'card', title: 'Card', text: 'Text' }] },
@@ -91,7 +90,7 @@ function defaultLayoutJson(): string {
 
 <template>
   <main class="admin-ui-page">
-    <BaseCard title="Home page templates" description="Edit the header, banner, sidebar, main area and footer layout.">
+    <BaseCard title="Home page templates" description="Edit the banner, sidebar, main area and footer layout.">
       <form class="admin-ui-page__form" @submit.prevent="submit">
         <BaseInput v-model="name" label="Name" placeholder="Default home page" />
         <label class="admin-ui-page__field">

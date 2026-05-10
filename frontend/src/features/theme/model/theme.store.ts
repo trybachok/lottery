@@ -7,6 +7,7 @@ const selectedThemeStorageKey = 'lottery.theme.id'
 type ThemeColors = {
   background?: string
   surface?: string
+  surfaceMutedText?: string
   text?: string
   mutedText?: string
   primary?: string
@@ -57,6 +58,7 @@ export const useThemeStore = defineStore('theme', () => {
     const colors = readColors(selectedTheme.value.tokens)
     setCssVariable('--color-bg', colors.background)
     setCssVariable('--color-surface', colors.surface)
+    setCssVariable('--color-surface-muted-text', resolveSurfaceMutedText(selectedTheme.value.tokens, colors))
     setCssVariable('--color-text', colors.text)
     setCssVariable('--color-text-muted', colors.mutedText)
     setCssVariable('--color-primary', colors.primary)
@@ -80,6 +82,14 @@ export const useThemeStore = defineStore('theme', () => {
     if (value) {
       document.documentElement.style.setProperty(name, value)
     }
+  }
+
+  function resolveSurfaceMutedText(tokens: UiTheme['tokens'], colors: ThemeColors): string | undefined {
+    if (colors.surfaceMutedText) {
+      return colors.surfaceMutedText
+    }
+
+    return tokens.mode === 'dark' ? colors.primaryText : colors.text
   }
 
   return {

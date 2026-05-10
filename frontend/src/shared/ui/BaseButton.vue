@@ -91,6 +91,7 @@ withDefaults(
 .base-button--secondary:hover:not(:disabled) {
   border-color: var(--color-border-strong);
   background: var(--color-surface-muted);
+  color: var(--color-surface-muted-text);
 }
 
 .base-button--danger {
@@ -105,6 +106,7 @@ withDefaults(
 
 .base-button--ghost:hover:not(:disabled) {
   background: var(--color-surface-muted);
+  color: var(--color-surface-muted-text);
 }
 
 .base-button__spinner {

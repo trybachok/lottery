@@ -136,7 +136,7 @@ async function logout(): Promise<void> {
 .app-shell__nav-link:hover,
 .app-shell__nav-link.router-link-active {
   background: var(--color-surface-muted);
-  color: var(--color-text);
+  color: var(--color-surface-muted-text);
 }
 
 .app-shell__user {

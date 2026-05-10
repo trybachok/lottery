@@ -164,6 +164,20 @@ public final class JdbcUserRepository implements UserRepository {
     }
 
     @Override
+    public boolean existsAny() {
+        String sql = "select 1 from users where deleted_at is null limit 1";
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql);
+                    ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next();
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to check users existence", exception);
+        }
+    }
+
+    @Override
     public boolean existsByEmailExceptId(String email, UUID id) {
         return existsExceptId("select 1 from users where email = ? and id <> ? and deleted_at is null", email, id);
     }

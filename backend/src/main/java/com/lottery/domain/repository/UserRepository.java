@@ -20,6 +20,10 @@ public interface UserRepository {
 
     boolean existsByLogin(String login);
 
+    default boolean existsAny() {
+        return !findAll(1, 0).isEmpty();
+    }
+
     default boolean existsByEmailExceptId(String email, UUID id) {
         return existsByEmail(email);
     }

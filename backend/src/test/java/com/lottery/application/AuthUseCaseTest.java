@@ -47,6 +47,41 @@ final class AuthUseCaseTest {
     }
 
     @Test
+    void firstOwnerRegistrationCreatesAdmin() {
+        InMemoryUserRepository users = new InMemoryUserRepository();
+        InMemoryRbacRepository rbac = new InMemoryRbacRepository();
+        RegisterUserUseCase useCase = new RegisterUserUseCase(
+                users,
+                rbac,
+                passwordHasher(),
+                directTransaction(),
+                fixedClock(),
+                new UserMapper());
+
+        useCase.execute(new RegisterUserCommand("owner@example.com", "owner", "secret"));
+
+        assertEquals(Set.of(RoleCodes.ADMIN), rbac.roles.get(users.saved.id()));
+    }
+
+    @Test
+    void ownerRegistrationAfterExistingUserCreatesClient() {
+        InMemoryUserRepository users = new InMemoryUserRepository();
+        InMemoryRbacRepository rbac = new InMemoryRbacRepository();
+        RegisterUserUseCase useCase = new RegisterUserUseCase(
+                users,
+                rbac,
+                passwordHasher(),
+                directTransaction(),
+                fixedClock(),
+                new UserMapper());
+        useCase.execute(new RegisterUserCommand("client@example.com", "client", "secret"));
+
+        var result = useCase.execute(new RegisterUserCommand("owner@example.com", "owner", "secret"));
+
+        assertEquals(Set.of(RoleCodes.CLIENT), rbac.roles.get(result.id()));
+    }
+
+    @Test
     void loginIssuesOpaqueBearerToken() {
         InMemoryUserRepository users = new InMemoryUserRepository();
         InMemoryRbacRepository rbac = new InMemoryRbacRepository();

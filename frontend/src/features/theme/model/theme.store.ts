@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { getHomePage } from '@/shared/api/generated/sdk.gen'
 import type { UiTheme } from '@/shared/api/generated/types.gen'
 
 const selectedThemeStorageKey = 'lottery.theme.id'
@@ -22,21 +23,39 @@ export const useThemeStore = defineStore('theme', () => {
   const themes = ref<UiTheme[]>([])
   const defaultTheme = ref<UiTheme | null>(null)
   const selectedThemeId = ref<string | null>(null)
+  const isLoading = ref(false)
 
   const selectedTheme = computed(() => {
     return themes.value.find((theme) => theme.id === selectedThemeId.value) ?? defaultTheme.value ?? themes.value[0] ?? null
   })
 
   function restoreSelection(): void {
-    selectedThemeId.value = window.localStorage.getItem(selectedThemeStorageKey)
+    selectedThemeId.value = getStorage()?.getItem(selectedThemeStorageKey) ?? null
+  }
+
+  async function loadAvailableThemes(): Promise<void> {
+    isLoading.value = true
+
+    try {
+      const response = await getHomePage({
+        throwOnError: true,
+      })
+      setAvailableThemes(response.data.themes, response.data.defaultTheme)
+    } catch (error) {
+      console.warn('Could not load UI themes', error)
+    } finally {
+      isLoading.value = false
+    }
   }
 
   function setAvailableThemes(nextThemes: UiTheme[], nextDefaultTheme: UiTheme): void {
     themes.value = nextThemes
     defaultTheme.value = nextDefaultTheme
 
-    const storedThemeId = selectedThemeId.value ?? window.localStorage.getItem(selectedThemeStorageKey)
-    selectedThemeId.value = nextThemes.some((theme) => theme.id === storedThemeId) ? storedThemeId : nextDefaultTheme.id
+    const storedThemeId = selectedThemeId.value ?? getStorage()?.getItem(selectedThemeStorageKey)
+    selectedThemeId.value = storedThemeId && nextThemes.some((theme) => theme.id === storedThemeId)
+      ? storedThemeId
+      : nextDefaultTheme.id
     applySelectedTheme()
   }
 
@@ -46,7 +65,7 @@ export const useThemeStore = defineStore('theme', () => {
     }
 
     selectedThemeId.value = themeId
-    window.localStorage.setItem(selectedThemeStorageKey, themeId)
+    getStorage()?.setItem(selectedThemeStorageKey, themeId)
     applySelectedTheme()
   }
 
@@ -97,9 +116,19 @@ export const useThemeStore = defineStore('theme', () => {
     defaultTheme,
     selectedThemeId,
     selectedTheme,
+    isLoading,
     restoreSelection,
+    loadAvailableThemes,
     setAvailableThemes,
     selectTheme,
     applySelectedTheme,
   }
 })
+
+function getStorage(): Storage | undefined {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  return window.localStorage
+}

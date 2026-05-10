@@ -16,6 +16,8 @@ app.use(pinia)
 app.use(router)
 
 useAuthStore().restoreSession()
-useThemeStore().restoreSelection()
+const themeStore = useThemeStore()
+themeStore.restoreSelection()
+void themeStore.loadAvailableThemes()
 
 app.mount('#app')

@@ -394,7 +394,7 @@ public final class ApplicationConfig {
                 uiMapper,
                 auditService);
 
-        ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService, rbacRepository);
+        ServletUseCaseContextFactory contextFactory = new ServletUseCaseContextFactory(tokenService, rbacRepository, transactionManager);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
         context.setContextPath("/");
         context.addFilter(new FilterHolder(new CorsFilter(properties.corsAllowedOrigins())), "/*", EnumSet.of(DispatcherType.REQUEST));

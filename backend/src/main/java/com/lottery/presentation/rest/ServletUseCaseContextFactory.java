@@ -2,6 +2,7 @@ package com.lottery.presentation.rest;
 
 import com.lottery.application.UseCaseContext;
 import com.lottery.application.port.auth.TokenVerifierPort;
+import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.domain.repository.RbacRepository;
 import com.lottery.presentation.middleware.RequestContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,23 +10,28 @@ import jakarta.servlet.http.HttpServletRequest;
 public final class ServletUseCaseContextFactory {
     private final TokenVerifierPort tokenVerifierPort;
     private final RbacRepository rbacRepository;
+    private final TransactionManager transactionManager;
 
-    public ServletUseCaseContextFactory(TokenVerifierPort tokenVerifierPort, RbacRepository rbacRepository) {
+    public ServletUseCaseContextFactory(
+            TokenVerifierPort tokenVerifierPort,
+            RbacRepository rbacRepository,
+            TransactionManager transactionManager) {
         this.tokenVerifierPort = tokenVerifierPort;
         this.rbacRepository = rbacRepository;
+        this.transactionManager = transactionManager;
     }
 
     public UseCaseContext from(HttpServletRequest request) {
         String token = bearerToken(request);
         TokenVerifierPort.AuthenticatedPrincipal principal = tokenVerifierPort.verify(token);
-        return new UseCaseContext(
-                principal.userId(),
-                rbacRepository.findPermissionCodesByUserId(principal.userId()),
-                requestId(request),
-                correlationId(request),
-                rbacRepository.findRoleCodesByUserId(principal.userId()),
-                request.getRemoteAddr(),
-                request.getHeader("User-Agent"));
+        return transactionManager.inTransaction(() -> new UseCaseContext(
+                    principal.userId(),
+                    rbacRepository.findPermissionCodesByUserId(principal.userId()),
+                    requestId(request),
+                    correlationId(request),
+                    rbacRepository.findRoleCodesByUserId(principal.userId()),
+                    request.getRemoteAddr(),
+                    request.getHeader("User-Agent")));
     }
 
     private String requestId(HttpServletRequest request) {

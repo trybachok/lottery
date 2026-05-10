@@ -22,14 +22,25 @@ public final class DatabaseAuthorizationAdapter implements AuthorizationPort {
         if (hasRole(context, RoleCodes.ADMIN)) {
             return;
         }
-        if (!rbacRepository.findPermissionCodesByUserId(context.actorUserId()).contains(permissionCode)) {
-            throw new ForbiddenException(permissionCode);
+        if (context.permissions().contains(permissionCode)) {
+            return;
         }
+        if (context.permissions().isEmpty()
+                && rbacRepository.findPermissionCodesByUserId(context.actorUserId()).contains(permissionCode)) {
+            return;
+        }
+        throw new ForbiddenException(permissionCode);
     }
 
     @Override
     public boolean hasRole(UseCaseContext context, String roleCode) {
         if (context == null || context.actorUserId() == null) {
+            return false;
+        }
+        if (context.actorRoleCodes().contains(roleCode)) {
+            return true;
+        }
+        if (!context.actorRoleCodes().isEmpty()) {
             return false;
         }
         return rbacRepository.findRoleCodesByUserId(context.actorUserId()).contains(roleCode);

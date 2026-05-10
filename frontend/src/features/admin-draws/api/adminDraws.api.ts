@@ -1,6 +1,7 @@
 import {
   adminAssignDrawManager,
   createDraw,
+  generateWinningCombination,
   getDraws,
   runDraw,
 } from '@/shared/api/generated/sdk.gen'
@@ -8,6 +9,7 @@ import type {
   AssignManagerRequest,
   CreateDrawRequest,
   Draw,
+  DrawResult,
   RunDrawResponse,
 } from '@/shared/api/generated/types.gen'
 
@@ -31,6 +33,17 @@ export async function createAdminDraw(request: CreateDrawRequest): Promise<Draw>
 
 export async function runAdminDraw(drawId: string): Promise<RunDrawResponse> {
   const response = await runDraw({
+    path: {
+      drawId,
+    },
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function generateAdminWinningCombination(drawId: string): Promise<DrawResult> {
+  const response = await generateWinningCombination({
     path: {
       drawId,
     },

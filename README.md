@@ -15,6 +15,7 @@ Docker-инфраструктуру для локального запуска.
 - управление розыгрышами и назначение менеджера;
 - создание билетов и bulk-создание билетов через API;
 - invoice/payment/refund/webhook flows через mock payment provider;
+- отдельная генерация выигрышной комбинации для тиража;
 - выполнение розыгрыша только по оплаченным билетам;
 - защита от повторного запуска розыгрыша;
 - неизменяемый результат после завершения розыгрыша;
@@ -211,7 +212,7 @@ http://127.0.0.1:8090/admin
 - `Users` - управление пользователями;
 - `Roles` - управление ролями;
 - `Permissions` - управление permissions;
-- `Draws` - создание и управление розыгрышами;
+- `Draws` - создание и управление розыгрышами, назначение менеджера, генерация выигрышной комбинации и запуск розыгрыша;
 - `Reports` - отчеты по розыгрышам и билетам;
 - `Audit` - аудит действий;
 - `Settings` - настройки Home page;
@@ -353,6 +354,7 @@ curl http://127.0.0.1:8090/api/v1/home-page
 
 - Первый admin пользователь не seed-ится миграциями: зарегистрируйте первым пользователя с логином `owner`, и backend автоматически назначит ему роль `ADMIN`.
 - UI для combination schemas, prizes и winning rules еще не выделен в отдельные админ-разделы; для полного сценария розыгрыша эти данные можно добавить через SQL или API/DB tooling.
+- Генерация выигрышной комбинации доступна в админке в разделе `Draws` кнопкой `Generate combination`, когда тираж находится в статусе `SALES_CLOSED`. После генерации тираж переходит в `DRAWING`, а комбинация сохраняется в `draw_results` и повторно не генерируется.
 - Frontend guards не заменяют backend RBAC: все реальные проверки прав выполняет backend.
 - `/docs` и `/api/v1/openapi.yaml` доступны только администратору.
 - Docker Compose публикует frontend на `127.0.0.1`, что подходит для локального запуска и production-схемы с reverse proxy.
@@ -361,7 +363,7 @@ curl http://127.0.0.1:8090/api/v1/home-page
 Важно: в текущей версии проекта часть действий есть в UI, 
 но часть полного lifecycle пока удобнее выполнять через `curl` и SQL, 
 потому что в админке нет отдельных экранов для `combination_schemas`, `prizes`, `winning_rules`, 
-а также нет кнопок `Activate` / `Close sales`.
+а также нет кнопок `Activate` / `Close sales`. Генерация выигрышной комбинации и запуск розыгрыша доступны в админке.
 
 # Сценарий 1. Базовая лотерея
 
@@ -481,6 +483,11 @@ echo "$CLIENT_USER_ID"
 ## 4. Подготовить схему комбинации
 
 В UI пока нет отдельного экрана для создания схемы комбинации, поэтому добавим её напрямую в БД.
+Backend уже умеет использовать эту схему при генерации выигрышной комбинации:
+
+- `positions` описывает количество и тип позиций в комбинации;
+- `allowDuplicates: false` запрещает повтор значений в одной комбинации;
+- `orderSensitive: true` означает, что совпадение считается по позициям.
 
 Для демонстрации создадим простую схему из двух чисел:
 
@@ -489,7 +496,8 @@ echo "$CLIENT_USER_ID"
 второе число 1 или 2
 ```
 
-Это нужно, чтобы гарантированно получить один билет `WIN`, а второй `LOSE`.
+С `allowDuplicates: false` выигрышная комбинация всегда будет либо `7,1`, либо `7,2`.
+Дальше в сценарии мы создадим два билета с этими комбинациями, поэтому один билет гарантированно станет `WIN`, а второй `LOSE`.
 
 ```bash
 export COMBINATION_SCHEMA_ID="11111111-1111-1111-1111-111111111111"
@@ -955,13 +963,68 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
 SALES_CLOSED
 ```
 
-После этого в админке кнопка `Run` должна стать доступной.
+После этого в админке в разделе `Draws` становятся доступны действия:
+
+```text
+Generate combination
+Run
+```
 
 ---
 
-## 14. Запустить розыгрыш и сгенерировать выигрышную комбинацию
+## 14. Сгенерировать выигрышную комбинацию
 
-Запуск розыгрыша:
+Вариант через админку:
+
+```text
+/admin/draws → Generate combination
+```
+
+Вариант через API:
+
+```bash
+DRAW_RESULT_RESPONSE=$(curl -s -X POST "$BASE/draws/$DRAW_ID/result" \
+  -H "Authorization: Bearer $ADMIN_TOKEN")
+
+echo "$DRAW_RESULT_RESPONSE" | jq
+```
+
+Backend:
+
+```text
+проверяет право draw.run
+проверяет, что тираж в статусе SALES_CLOSED
+генерирует выигрышную комбинацию по CombinationSchema
+сохраняет immutable draw_result
+сохраняет algorithmVersion, randomProvider, proofHash и request/correlation ids
+переводит тираж в DRAWING
+```
+
+Пример ответа:
+
+```json
+{
+  "drawId": "...",
+  "winningCombinationValues": ["7", "1"],
+  "algorithmVersion": "json-schema-secure-random-v1",
+  "randomProvider": "SecureRandom",
+  "proofHash": "..."
+}
+```
+
+Повторная генерация для того же тиража вернет `409`, потому что результат уже сохранен.
+
+---
+
+## 15. Запустить розыгрыш
+
+Вариант через админку:
+
+```text
+/admin/draws → Run
+```
+
+Вариант через API:
 
 ```bash
 RUN_RESPONSE=$(curl -s -X POST "$BASE/draws/$DRAW_ID/run" \
@@ -973,13 +1036,14 @@ echo "$RUN_RESPONSE" | jq
 Backend автоматически:
 
 ```text
-переводит тираж в DRAWING
-генерирует выигрышную комбинацию
-создаёт draw_result
+использует уже сохраненную выигрышную комбинацию
 проверяет оплаченные билеты
 проставляет билетам WIN или LOSE
 переводит тираж в COMPLETED
 ```
+
+Если вызвать `Run` сразу для тиража в статусе `SALES_CLOSED`, backend сохранит обратную совместимость:
+он сам сгенерирует комбинацию, создаст `draw_result` и завершит розыгрыш одним действием.
 
 В ответе будет примерно такая структура:
 
@@ -997,7 +1061,7 @@ Backend автоматически:
 
 ---
 
-## 15. Получить результат тиража
+## 16. Получить результат тиража
 
 ```bash
 curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
@@ -1017,7 +1081,7 @@ curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
 
 ---
 
-## 16. Проверить результат билетов
+## 17. Проверить результат билетов
 
 Проверить первый билет:
 
@@ -1047,7 +1111,7 @@ LOSE
 
 ---
 
-## 17. Отобразить финальные статусы билетов
+## 18. Отобразить финальные статусы билетов
 
 Через API:
 
@@ -1188,9 +1252,27 @@ curl -s -X POST "$BASE/draws/$DRAW_ID/close-sales" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
-После этого в UI админки кнопка `Run` станет доступной.
+После этого в UI админки станут доступны кнопки `Generate combination` и `Run`.
 
-Можно нажать `Run` в админке или выполнить:
+Рекомендуемый UI-сценарий:
+
+```text
+/admin/draws → Generate combination → Run
+```
+
+Можно также выполнить через API двумя шагами:
+
+```bash
+curl -s -X POST "$BASE/draws/$DRAW_ID/result" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+```
+
+```bash
+curl -s -X POST "$BASE/draws/$DRAW_ID/run" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
+```
+
+Если нажать `Run` сразу для `SALES_CLOSED`, backend сам сгенерирует комбинацию и завершит розыгрыш одним запросом:
 
 ```bash
 curl -s -X POST "$BASE/draws/$DRAW_ID/run" \
@@ -1234,9 +1316,9 @@ DRAFT
 ACTIVE
   ↓ close-sales
 SALES_CLOSED
-  ↓ run
+  ↓ generate combination
 DRAWING
-  ↓ автоматически после run
+  ↓ run
 COMPLETED
 ```
 
@@ -1277,9 +1359,9 @@ salesEndAt >= текущее время
 
 ---
 
-## `Draw must be in SALES_CLOSED status`
+## `Draw must be in SALES_CLOSED or DRAWING status`
 
-Причина: попытка нажать `Run`, когда тираж ещё `ACTIVE`.
+Причина: попытка нажать `Generate combination` или `Run`, когда тираж ещё `ACTIVE`.
 
 Нужно выполнить:
 
@@ -1295,6 +1377,20 @@ curl -s -X POST "$BASE/draws/$DRAW_ID/close-sales" \
 Причина: для тиража не добавлены `winning_rules`.
 
 Нужно выполнить шаг 7 и добавить приз + правило выигрыша.
+
+---
+
+## `Draw winning combination already exists`
+
+Причина: выигрышная комбинация для тиража уже была сгенерирована.
+
+Что делать:
+
+```text
+не нажимать Generate combination повторно
+перейти к Run для завершения розыгрыша
+посмотреть сохраненный результат через GET /draws/{drawId}/result
+```
 
 ---
 
@@ -2499,7 +2595,48 @@ curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 ---
 
-## 4.2. Запустить розыгрыш
+## 4.2. Сгенерировать выигрышную комбинацию
+
+Через UI:
+
+```text
+/admin/draws → Generate combination
+```
+
+Через API:
+
+```bash id="generate-result"
+DRAW_RESULT_RESPONSE=$(curl -s -X POST "$BASE/draws/$DRAW_ID/result" \
+  -H "Authorization: Bearer $ADMIN_TOKEN")
+
+echo "$DRAW_RESULT_RESPONSE" | jq
+```
+
+После этого backend:
+
+```text id="generate-result-steps"
+1. Генерирует выигрышную комбинацию.
+2. Создаёт immutable draw_result.
+3. Сохраняет proofHash, randomProvider, algorithmVersion.
+4. Переводит тираж в DRAWING.
+```
+
+Проверить статус тиража:
+
+```bash id="check-drawing"
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "$BASE/draws/$DRAW_ID" | jq '{id, title, status}'
+```
+
+Ожидаемый статус:
+
+```text id="drawing-status"
+DRAWING
+```
+
+---
+
+## 4.3. Запустить розыгрыш
 
 ```bash id="mxxl3j"
 RUN_RESPONSE=$(curl -s -X POST "$BASE/draws/$DRAW_ID/run" \
@@ -2511,11 +2648,10 @@ echo "$RUN_RESPONSE" | jq
 После этого backend:
 
 ```text id="v3owyo"
-1. Генерирует выигрышную комбинацию.
-2. Создаёт draw_result.
-3. Обрабатывает оплаченные билеты.
-4. Проставляет билетам WIN или LOSE.
-5. Переводит тираж в COMPLETED.
+1. Использует уже сохраненный draw_result.
+2. Обрабатывает оплаченные билеты.
+3. Проставляет билетам WIN или LOSE.
+4. Переводит тираж в COMPLETED.
 ```
 
 Проверить статус тиража:
@@ -2533,7 +2669,7 @@ COMPLETED
 
 ---
 
-## 4.3. Получить результат тиража через curl
+## 4.4. Получить результат тиража через curl
 
 ```bash id="pjzek4"
 curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
@@ -2556,7 +2692,7 @@ curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
 
 ---
 
-## 4.4. Получить результат тиража через UI
+## 4.5. Получить результат тиража через UI
 
 Открыть страницу тиража:
 
@@ -2589,7 +2725,7 @@ Result is not published yet.
 
 ---
 
-## 4.5. Проверить результат билета через curl
+## 4.6. Проверить результат билета через curl
 
 ```bash id="zxd4p9"
 curl -s -X POST "$BASE/tickets/$TICKET_ID/check" \
@@ -2626,7 +2762,7 @@ curl -s -H "Authorization: Bearer $CLIENT_TOKEN" \
 
 ---
 
-## 4.6. Проверить результат билета через UI
+## 4.7. Проверить результат билета через UI
 
 Открыть страницу билета:
 

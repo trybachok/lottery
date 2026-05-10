@@ -7,8 +7,6 @@ import com.lottery.application.audit.AuditService;
 import com.lottery.application.dto.RunDrawResultDto;
 import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.lottery.CombinationEvaluatorPort;
-import com.lottery.application.port.lottery.WinningCombinationGeneratorPort;
-import com.lottery.application.port.lottery.WinningCombinationGeneratorPort.GeneratedWinningCombination;
 import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.domain.model.CombinationSchema;
 import com.lottery.domain.model.Draw;
@@ -27,7 +25,6 @@ import com.lottery.domain.repository.PaymentRepository;
 import com.lottery.domain.repository.TicketRepository;
 import com.lottery.domain.repository.WinningRuleRepository;
 import com.lottery.domain.service.DomainClock;
-import com.lottery.domain.valueobject.DomainIds;
 import com.lottery.domain.valueobject.DrawStatus;
 import com.lottery.domain.valueobject.InvoiceStatus;
 import com.lottery.domain.valueobject.PaymentStatus;
@@ -52,7 +49,7 @@ public final class RunDrawUseCase {
     private final PaymentRepository paymentRepository;
     private final AuthorizationPort authorizationPort;
     private final TransactionManager transactionManager;
-    private final WinningCombinationGeneratorPort generator;
+    private final GenerateWinningCombinationUseCase generateWinningCombinationUseCase;
     private final CombinationEvaluatorPort evaluator;
     private final DrawStatusTransitionPolicy transitionPolicy;
     private final TicketParticipationPolicy ticketParticipationPolicy;
@@ -69,7 +66,7 @@ public final class RunDrawUseCase {
             PaymentRepository paymentRepository,
             AuthorizationPort authorizationPort,
             TransactionManager transactionManager,
-            WinningCombinationGeneratorPort generator,
+            GenerateWinningCombinationUseCase generateWinningCombinationUseCase,
             CombinationEvaluatorPort evaluator,
             DrawStatusTransitionPolicy transitionPolicy,
             TicketParticipationPolicy ticketParticipationPolicy,
@@ -84,7 +81,7 @@ public final class RunDrawUseCase {
                 paymentRepository,
                 authorizationPort,
                 transactionManager,
-                generator,
+                generateWinningCombinationUseCase,
                 evaluator,
                 transitionPolicy,
                 ticketParticipationPolicy,
@@ -102,7 +99,7 @@ public final class RunDrawUseCase {
             PaymentRepository paymentRepository,
             AuthorizationPort authorizationPort,
             TransactionManager transactionManager,
-            WinningCombinationGeneratorPort generator,
+            GenerateWinningCombinationUseCase generateWinningCombinationUseCase,
             CombinationEvaluatorPort evaluator,
             DrawStatusTransitionPolicy transitionPolicy,
             TicketParticipationPolicy ticketParticipationPolicy,
@@ -117,7 +114,7 @@ public final class RunDrawUseCase {
         this.paymentRepository = paymentRepository;
         this.authorizationPort = authorizationPort;
         this.transactionManager = transactionManager;
-        this.generator = generator;
+        this.generateWinningCombinationUseCase = generateWinningCombinationUseCase;
         this.evaluator = evaluator;
         this.transitionPolicy = transitionPolicy;
         this.ticketParticipationPolicy = ticketParticipationPolicy;
@@ -129,39 +126,32 @@ public final class RunDrawUseCase {
         return transactionManager.inTransaction(() -> {
             authorizationPort.ensurePermission(context, PermissionCodes.DRAW_RUN);
             Draw draw = drawRepository.findByIdForUpdate(drawId).orElseThrow(() -> new NotFoundException("Draw"));
-            if (drawResultRepository.existsByDrawId(drawId) || draw.status() == DrawStatus.COMPLETED) {
+            DrawResult savedResult = drawResultRepository.findByDrawId(drawId).orElse(null);
+            if (draw.status() == DrawStatus.COMPLETED) {
                 throw new ConflictException("DRAW_ALREADY_RUN", "Draw result already exists");
             }
-            if (draw.status() != DrawStatus.SALES_CLOSED) {
-                throw new ConflictException("DRAW_NOT_READY", "Draw must be in SALES_CLOSED status");
+            if (draw.status() == DrawStatus.SALES_CLOSED && savedResult != null) {
+                throw new ConflictException("DRAW_RESULT_ALREADY_EXISTS", "Draw winning combination already exists");
             }
-            if (!transitionPolicy.canTransition(draw.status(), DrawStatus.DRAWING)) {
-                throw new ConflictException("DRAW_STATUS_TRANSITION_FORBIDDEN", "Draw cannot transition to DRAWING");
+            if (draw.status() != DrawStatus.SALES_CLOSED && draw.status() != DrawStatus.DRAWING) {
+                throw new ConflictException("DRAW_NOT_READY", "Draw must be in SALES_CLOSED or DRAWING status");
+            }
+            if (draw.status() == DrawStatus.DRAWING && savedResult == null) {
+                throw new ConflictException("DRAW_RESULT_REQUIRED", "Draw winning combination must be generated before completion");
             }
             List<WinningRule> winningRules = winningRuleRepository.findByDrawIdOrderByPriority(draw.id());
             if (winningRules.isEmpty()) {
                 throw new ConflictException("DRAW_WINNING_RULES_REQUIRED", "Draw cannot be run without winning rules");
             }
 
-            Instant startedAt = clock.now();
             log.info("requestId={} drawId={} run_draw_started", context.requestId(), drawId);
-            Draw drawing = drawRepository.update(draw.withStatus(DrawStatus.DRAWING, startedAt));
+            if (draw.status() == DrawStatus.SALES_CLOSED) {
+                savedResult = generateWinningCombinationUseCase.generate(draw.id(), context);
+            }
+            Draw drawing = drawRepository.findByIdForUpdate(draw.id()).orElseThrow(() -> new NotFoundException("Draw"));
             CombinationSchema schema = combinationSchemaRepository
                     .findById(drawing.combinationSchemaId())
                     .orElseThrow(() -> new NotFoundException("CombinationSchema"));
-            GeneratedWinningCombination generated = generator.generate(schema);
-            DrawResult drawResult = new DrawResult(
-                    DomainIds.newId(),
-                    drawing.id(),
-                    generated.combination(),
-                    generated.algorithmVersion(),
-                    generated.randomProvider(),
-                    generated.proofHash(),
-                    context.actorUserId(),
-                    startedAt,
-                    context.requestId(),
-                    context.correlationId());
-            DrawResult savedResult = drawResultRepository.save(drawResult);
 
             List<Ticket> paidTickets = ticketRepository.findPaidByDrawId(drawing.id());
             int winningTickets = 0;
@@ -182,7 +172,7 @@ public final class RunDrawUseCase {
                             providerPaymentConfirmed);
                     continue;
                 }
-                BigDecimal matchPercent = evaluator.matchPercent(ticket.combination(), generated.combination(), schema);
+                BigDecimal matchPercent = evaluator.matchPercent(ticket.combination(), savedResult.winningCombination(), schema);
                 WinningRule matchingRule = findMatchingRule(winningRules, matchPercent);
                 if (matchingRule == null) {
                     ticketRepository.update(ticket.withDrawResult(TicketStatus.LOSE, matchPercent, null, participatedAt, checkedAt));
@@ -213,7 +203,7 @@ public final class RunDrawUseCase {
             return new RunDrawResultDto(
                     drawing.id(),
                     savedResult.id(),
-                    generated.combination().values(),
+                    savedResult.winningCombination().values(),
                     processedTickets,
                     winningTickets,
                     losingTickets,

@@ -1,10 +1,11 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { mapApiError, type FrontendApiError } from '@/shared/api/errors'
-import type { CreateDrawRequest, Draw, RunDrawResponse } from '@/shared/api/generated/types.gen'
+import type { CreateDrawRequest, Draw, DrawResult, RunDrawResponse } from '@/shared/api/generated/types.gen'
 import {
   assignDrawManager,
   createAdminDraw,
+  generateAdminWinningCombination,
   listAdminDraws,
   runAdminDraw,
 } from '../api/adminDraws.api'
@@ -12,8 +13,10 @@ import {
 export const useAdminDrawsStore = defineStore('admin-draws', () => {
   const items = ref<Draw[]>([])
   const lastRunResult = ref<RunDrawResponse | null>(null)
+  const lastGeneratedResult = ref<DrawResult | null>(null)
   const isLoading = ref(false)
   const isCreating = ref(false)
+  const generatingDrawId = ref<string | null>(null)
   const runningDrawId = ref<string | null>(null)
   const assigningManagerDrawId = ref<string | null>(null)
   const error = ref<FrontendApiError | null>(null)
@@ -66,6 +69,24 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
     }
   }
 
+  async function generateWinningCombination(drawId: string): Promise<DrawResult | null> {
+    generatingDrawId.value = drawId
+    actionError.value = null
+    lastGeneratedResult.value = null
+
+    try {
+      const result = await generateAdminWinningCombination(drawId)
+      lastGeneratedResult.value = result
+      await loadDraws()
+      return result
+    } catch (caughtError) {
+      actionError.value = mapApiError(caughtError)
+      return null
+    } finally {
+      generatingDrawId.value = null
+    }
+  }
+
   async function assignManager(drawId: string, managerId: string): Promise<Draw | null> {
     assigningManagerDrawId.value = drawId
     actionError.value = null
@@ -89,14 +110,17 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
   return {
     items,
     lastRunResult,
+    lastGeneratedResult,
     isLoading,
     isCreating,
+    generatingDrawId,
     runningDrawId,
     assigningManagerDrawId,
     error,
     actionError,
     loadDraws,
     createDraw,
+    generateWinningCombination,
     runDraw,
     assignManager,
     clearActionError,

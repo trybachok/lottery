@@ -7,6 +7,8 @@ import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.lottery.CombinationEvaluatorPort;
 import com.lottery.application.port.lottery.WinningCombinationGeneratorPort;
 import com.lottery.application.port.transaction.TransactionManager;
+import com.lottery.application.mapper.DrawResultMapper;
+import com.lottery.application.usecase.draw.GenerateWinningCombinationUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
 import com.lottery.domain.model.CombinationSchema;
 import com.lottery.domain.model.Draw;
@@ -90,6 +92,19 @@ final class RunDrawUseCaseTest {
     }
 
     @Test
+    void completesDrawWithPreviouslyGeneratedWinningCombination() {
+        TestFixture fixture = new TestFixture();
+
+        var generated = fixture.generateWinningCombinationUseCase.execute(fixture.draw.id(), context());
+        var result = fixture.useCase.execute(fixture.draw.id(), context());
+
+        assertEquals(generated.id(), result.drawResultId());
+        assertEquals(1, fixture.results.results.size());
+        assertEquals(DrawStatus.COMPLETED, fixture.draws.findById(fixture.draw.id()).orElseThrow().status());
+        assertEquals(TicketStatus.WIN, fixture.tickets.byId.get(fixture.winningTicket.id()).status());
+    }
+
+    @Test
     void rejectsDrawWithoutWinningRules() {
         TestFixture fixture = new TestFixture(List.of());
 
@@ -134,6 +149,7 @@ final class RunDrawUseCaseTest {
         private final InMemoryInvoiceRepository invoices;
         private final InMemoryPaymentRepository payments;
         private final List<WinningRule> winningRules;
+        private final GenerateWinningCombinationUseCase generateWinningCombinationUseCase;
         private final RunDrawUseCase useCase;
 
         private TestFixture() {
@@ -156,14 +172,33 @@ final class RunDrawUseCaseTest {
             losingPayment = capturedPayment(losingInvoice);
             invoices = new InMemoryInvoiceRepository(List.of(winningInvoice, losingInvoice));
             payments = new InMemoryPaymentRepository(List.of(winningPayment, losingPayment));
+            CombinationSchemaRepository schemas = id -> Optional.of(new CombinationSchema(
+                    schemaId,
+                    "numbers",
+                    new CombinationSchemaDefinition(
+                            "{\"positions\":[{\"type\":\"NUMBER\"},{\"type\":\"NUMBER\"}],\"orderSensitive\":true}"),
+                    NOW));
+            WinningCombinationGeneratorPort generator = schema -> new WinningCombinationGeneratorPort.GeneratedWinningCombination(
+                    new Combination(List.of("1", "2")),
+                    "test",
+                    "test",
+                    "proof");
+            generateWinningCombinationUseCase = new GenerateWinningCombinationUseCase(
+                    draws,
+                    schemas,
+                    results,
+                    grantAll(),
+                    directTransaction(),
+                    generator,
+                    (combination, schema) -> {
+                    },
+                    new DrawStatusTransitionPolicy(),
+                    fixedClock(),
+                    new DrawResultMapper(),
+                    null);
             useCase = new RunDrawUseCase(
                     draws,
-                    id -> Optional.of(new CombinationSchema(
-                            schemaId,
-                            "numbers",
-                            new CombinationSchemaDefinition(
-                                    "{\"positions\":[{\"type\":\"NUMBER\"},{\"type\":\"NUMBER\"}],\"orderSensitive\":true}"),
-                            NOW)),
+                    schemas,
                     results,
                     tickets,
                     drawId -> this.winningRules,
@@ -171,11 +206,7 @@ final class RunDrawUseCaseTest {
                     payments,
                     grantAll(),
                     directTransaction(),
-                    schema -> new WinningCombinationGeneratorPort.GeneratedWinningCombination(
-                            new Combination(List.of("1", "2")),
-                            "test",
-                            "test",
-                            "proof"),
+                    generateWinningCombinationUseCase,
                     evaluator(),
                     new DrawStatusTransitionPolicy(),
                     new TicketParticipationPolicy(),

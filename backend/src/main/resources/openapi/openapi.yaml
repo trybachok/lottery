@@ -426,6 +426,32 @@ paths:
         '409':
           $ref: '#/components/responses/Error'
   /draws/{drawId}/result:
+    post:
+      tags: [Draws]
+      operationId: generateWinningCombination
+      summary: Generate winning combination
+      description: Creates immutable draw result and moves the draw from SALES_CLOSED to DRAWING.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '201':
+          description: Winning combination generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DrawResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
     get:
       tags: [Draws]
       operationId: getDrawResult

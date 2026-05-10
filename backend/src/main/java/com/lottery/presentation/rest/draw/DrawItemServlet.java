@@ -8,6 +8,7 @@ import com.lottery.application.dto.DrawResultDto;
 import com.lottery.application.dto.RunDrawResultDto;
 import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase;
 import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase.DrawLifecycleAction;
+import com.lottery.application.usecase.draw.GenerateWinningCombinationUseCase;
 import com.lottery.application.usecase.draw.GetDrawUseCase;
 import com.lottery.application.usecase.draw.GetDrawResultUseCase;
 import com.lottery.application.usecase.draw.RunDrawUseCase;
@@ -26,6 +27,7 @@ public final class DrawItemServlet extends JsonServlet {
     private final GetDrawUseCase getDrawUseCase;
     private final UpdateDrawUseCase updateDrawUseCase;
     private final ChangeDrawStatusUseCase changeStatusUseCase;
+    private final GenerateWinningCombinationUseCase generateWinningCombinationUseCase;
     private final RunDrawUseCase runDrawUseCase;
     private final GetDrawResultUseCase getDrawResultUseCase;
     private final ServletUseCaseContextFactory contextFactory;
@@ -36,6 +38,7 @@ public final class DrawItemServlet extends JsonServlet {
             GetDrawUseCase getDrawUseCase,
             UpdateDrawUseCase updateDrawUseCase,
             ChangeDrawStatusUseCase changeStatusUseCase,
+            GenerateWinningCombinationUseCase generateWinningCombinationUseCase,
             RunDrawUseCase runDrawUseCase,
             GetDrawResultUseCase getDrawResultUseCase,
             ServletUseCaseContextFactory contextFactory) {
@@ -43,6 +46,7 @@ public final class DrawItemServlet extends JsonServlet {
         this.getDrawUseCase = getDrawUseCase;
         this.updateDrawUseCase = updateDrawUseCase;
         this.changeStatusUseCase = changeStatusUseCase;
+        this.generateWinningCombinationUseCase = generateWinningCombinationUseCase;
         this.runDrawUseCase = runDrawUseCase;
         this.getDrawResultUseCase = getDrawResultUseCase;
         this.contextFactory = contextFactory;
@@ -109,6 +113,11 @@ public final class DrawItemServlet extends JsonServlet {
             if ("run".equals(path.action())) {
                 RunDrawResultDto result = runDrawUseCase.execute(path.drawId(), contextFactory.from(request));
                 writeJson(response, 200, result);
+                return;
+            }
+            if ("result".equals(path.action())) {
+                DrawResultDto result = generateWinningCombinationUseCase.execute(path.drawId(), contextFactory.from(request));
+                writeJson(response, 201, result);
                 return;
             }
             DrawLifecycleAction action = lifecycleAction(path.action());

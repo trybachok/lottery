@@ -17,6 +17,7 @@ import com.lottery.application.usecase.admin.AdminRbacUseCase;
 import com.lottery.application.usecase.draw.CreateDrawUseCase;
 import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase;
 import com.lottery.application.usecase.draw.AssignDrawManagerUseCase;
+import com.lottery.application.usecase.draw.GenerateWinningCombinationUseCase;
 import com.lottery.application.usecase.draw.GetDrawUseCase;
 import com.lottery.application.usecase.draw.GetDrawResultUseCase;
 import com.lottery.application.usecase.draw.ListDrawsUseCase;
@@ -214,6 +215,18 @@ public final class ApplicationConfig {
                 new DrawMapper(),
                 auditService);
         JsonCombinationEngine combinationEngine = new JsonCombinationEngine(objectMapper);
+        GenerateWinningCombinationUseCase generateWinningCombinationUseCase = new GenerateWinningCombinationUseCase(
+                drawRepository,
+                combinationSchemaRepository,
+                drawResultRepository,
+                authorizationPort,
+                transactionManager,
+                combinationEngine,
+                combinationEngine,
+                new DrawStatusTransitionPolicy(),
+                clock,
+                new DrawResultMapper(),
+                auditService);
         RunDrawUseCase runDrawUseCase = new RunDrawUseCase(
                 drawRepository,
                 combinationSchemaRepository,
@@ -224,7 +237,7 @@ public final class ApplicationConfig {
                 paymentRepository,
                 authorizationPort,
                 transactionManager,
-                combinationEngine,
+                generateWinningCombinationUseCase,
                 combinationEngine,
                 new DrawStatusTransitionPolicy(),
                 new TicketParticipationPolicy(),
@@ -430,6 +443,7 @@ public final class ApplicationConfig {
                         getDrawUseCase,
                         updateDrawUseCase,
                         changeDrawStatusUseCase,
+                        generateWinningCombinationUseCase,
                         runDrawUseCase,
                         getDrawResultUseCase,
                         contextFactory)),

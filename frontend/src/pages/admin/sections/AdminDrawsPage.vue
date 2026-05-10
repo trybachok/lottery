@@ -53,6 +53,12 @@ async function createDraw(request: CreateDrawRequest): Promise<void> {
     />
 
     <BaseCard
+      v-if="adminDrawsStore.lastGeneratedResult"
+      title="Winning combination generated"
+      :description="`Combination: ${adminDrawsStore.lastGeneratedResult.winningCombinationValues.join(', ')}`"
+    />
+
+    <BaseCard
       v-if="adminDrawsStore.lastRunResult"
       title="Draw completed"
       :description="`Processed ${adminDrawsStore.lastRunResult.processedTickets} tickets. Winners: ${adminDrawsStore.lastRunResult.winningTickets}.`"
@@ -67,10 +73,13 @@ async function createDraw(request: CreateDrawRequest): Promise<void> {
     <AdminDrawsTable
       v-else
       :draws="adminDrawsStore.items"
+      :generating-draw-id="adminDrawsStore.generatingDrawId"
       :running-draw-id="adminDrawsStore.runningDrawId"
       :assigning-manager-draw-id="adminDrawsStore.assigningManagerDrawId"
+      :can-generate="canRunDraw"
       :can-run="canRunDraw"
       :can-assign-manager="canUpdateDraw"
+      @generate-winning-combination="adminDrawsStore.generateWinningCombination"
       @run-draw="adminDrawsStore.runDraw"
       @assign-manager="adminDrawsStore.assignManager"
     />

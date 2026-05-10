@@ -15,9 +15,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class JsonCombinationEngine implements WinningCombinationGeneratorPort, CombinationEvaluatorPort, CombinationValidatorPort {
     private static final String ALGORITHM_VERSION = "json-schema-secure-random-v1";
@@ -43,9 +45,13 @@ public final class JsonCombinationEngine implements WinningCombinationGeneratorP
             if (!positions.isArray() || positions.isEmpty()) {
                 throw new IllegalArgumentException("Combination schema positions must be a non-empty array");
             }
+            boolean allowDuplicates = root.path("allowDuplicates").asBoolean(true);
             List<String> values = new ArrayList<>();
+            Set<String> usedValues = new HashSet<>();
             for (JsonNode position : positions) {
-                values.add(generateValue(position));
+                String value = generateUniqueValue(position, allowDuplicates, usedValues);
+                values.add(value);
+                usedValues.add(value);
             }
             Combination combination = new Combination(values);
             return new GeneratedWinningCombination(
@@ -166,6 +172,16 @@ public final class JsonCombinationEngine implements WinningCombinationGeneratorP
             case "IMAGE" -> "IMAGE:" + position.path("allowedAssetGroupId").asText("default");
             default -> throw new IllegalArgumentException("Unsupported combination position type: " + type);
         };
+    }
+
+    private String generateUniqueValue(JsonNode position, boolean allowDuplicates, Set<String> usedValues) {
+        for (int attempt = 0; attempt < 1024; attempt++) {
+            String value = generateValue(position);
+            if (allowDuplicates || !usedValues.contains(value)) {
+                return value;
+            }
+        }
+        throw new IllegalArgumentException("Unable to generate unique combination value for schema position");
     }
 
     private int countOrderedMatches(List<String> left, List<String> right) {

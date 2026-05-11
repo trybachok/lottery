@@ -68,6 +68,10 @@ function canActivateByStatus(draw: Draw): boolean {
   return ['DRAFT', 'SCHEDULED', 'PAUSED', 'POSTPONED'].includes(draw.status)
 }
 
+function hasVisibleActions(draw: Draw): boolean {
+  return canActivateByStatus(draw) || Boolean(props.canGenerate || props.canRun)
+}
+
 function canActivateByAccess(draw: Draw): boolean {
   if (!props.canActivate) {
     return false
@@ -121,7 +125,7 @@ function activateDisabledReason(draw: Draw): string | undefined {
       </template>
 
       <template #actions="{ row }">
-        <div v-if="props.canActivate || props.canGenerate || props.canRun" class="admin-draws-table__actions">
+        <div v-if="hasVisibleActions(row)" class="admin-draws-table__actions">
           <BaseButton
             v-if="canActivateByStatus(row)"
             size="sm"

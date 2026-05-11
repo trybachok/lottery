@@ -7,13 +7,17 @@ import com.lottery.application.mapper.DrawMapper;
 import com.lottery.application.mapper.DrawResultMapper;
 import com.lottery.application.mapper.InvoiceMapper;
 import com.lottery.application.mapper.PaymentMapper;
+import com.lottery.application.mapper.PrizeMapper;
 import com.lottery.application.mapper.TicketMapper;
 import com.lottery.application.mapper.UiMapper;
 import com.lottery.application.mapper.UserMapper;
+import com.lottery.application.mapper.WinningRuleMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.auth.PasswordHasher;
 import com.lottery.application.usecase.audit.ListAuditLogsUseCase;
 import com.lottery.application.usecase.admin.AdminRbacUseCase;
+import com.lottery.application.usecase.admin.AdminPrizeUseCase;
+import com.lottery.application.usecase.admin.AdminWinningRuleUseCase;
 import com.lottery.application.usecase.draw.CreateDrawUseCase;
 import com.lottery.application.usecase.draw.ChangeDrawStatusUseCase;
 import com.lottery.application.usecase.draw.AssignDrawManagerUseCase;
@@ -59,6 +63,7 @@ import com.lottery.domain.repository.InvoiceRepository;
 import com.lottery.domain.repository.PaymentRepository;
 import com.lottery.domain.repository.PaymentOutboxRepository;
 import com.lottery.domain.repository.PaymentWebhookEventRepository;
+import com.lottery.domain.repository.PrizeRepository;
 import com.lottery.domain.repository.RbacRepository;
 import com.lottery.domain.repository.SystemSettingsRepository;
 import com.lottery.domain.repository.TicketRepository;
@@ -79,6 +84,7 @@ import com.lottery.infrastructure.persistence.jdbc.JdbcInvoiceRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentOutboxRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcPaymentWebhookEventRepository;
+import com.lottery.infrastructure.persistence.jdbc.JdbcPrizeRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcRbacRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcSystemSettingsRepository;
 import com.lottery.infrastructure.persistence.jdbc.JdbcTicketRepository;
@@ -96,6 +102,7 @@ import com.lottery.presentation.middleware.RequestContextFilter;
 import com.lottery.presentation.rest.OpenApiServlet;
 import com.lottery.presentation.rest.ServletUseCaseContextFactory;
 import com.lottery.presentation.rest.admin.AdminPermissionsServlet;
+import com.lottery.presentation.rest.admin.AdminPrizesServlet;
 import com.lottery.presentation.rest.admin.AdminRolesServlet;
 import com.lottery.presentation.rest.admin.AdminSettingsServlet;
 import com.lottery.presentation.rest.admin.AdminUiTemplatesServlet;
@@ -143,6 +150,7 @@ public final class ApplicationConfig {
         TicketRepository ticketRepository = new JdbcTicketRepository(transactionManager, objectMapper);
         CombinationSchemaRepository combinationSchemaRepository = new JdbcCombinationSchemaRepository(transactionManager);
         DrawResultRepository drawResultRepository = new JdbcDrawResultRepository(transactionManager, objectMapper);
+        PrizeRepository prizeRepository = new JdbcPrizeRepository(transactionManager);
         WinningRuleRepository winningRuleRepository = new JdbcWinningRuleRepository(transactionManager);
         InvoiceRepository invoiceRepository = new JdbcInvoiceRepository(transactionManager);
         PaymentRepository paymentRepository = new JdbcPaymentRepository(transactionManager);
@@ -397,6 +405,21 @@ public final class ApplicationConfig {
                 clock,
                 new DrawMapper(),
                 auditService);
+        AdminPrizeUseCase adminPrizeUseCase = new AdminPrizeUseCase(
+                prizeRepository,
+                authorizationPort,
+                transactionManager,
+                new PrizeMapper(),
+                auditService);
+        AdminWinningRuleUseCase adminWinningRuleUseCase = new AdminWinningRuleUseCase(
+                drawRepository,
+                drawResultRepository,
+                prizeRepository,
+                winningRuleRepository,
+                authorizationPort,
+                transactionManager,
+                new WinningRuleMapper(),
+                auditService);
         GetOpenApiDocumentUseCase getOpenApiDocumentUseCase = new GetOpenApiDocumentUseCase(
                 new OpenApiResource(),
                 authorizationPort,
@@ -513,6 +536,9 @@ public final class ApplicationConfig {
                 new ServletHolder(new AdminPermissionsServlet(objectMapper, errorHandler, adminRbacUseCase, contextFactory)),
                 "/api/v1/admin/permissions/*");
         context.addServlet(
+                new ServletHolder(new AdminPrizesServlet(objectMapper, errorHandler, adminPrizeUseCase, contextFactory)),
+                "/api/v1/admin/prizes/*");
+        context.addServlet(
                 new ServletHolder(new AdminUiThemesServlet(objectMapper, errorHandler, adminUiUseCase, contextFactory)),
                 "/api/v1/admin/ui-themes/*");
         context.addServlet(
@@ -522,7 +548,12 @@ public final class ApplicationConfig {
                 new ServletHolder(new AdminSettingsServlet(objectMapper, errorHandler, adminUiUseCase, contextFactory)),
                 "/api/v1/admin/settings/*");
         context.addServlet(
-                new ServletHolder(new AssignDrawManagerServlet(objectMapper, errorHandler, assignDrawManagerUseCase, contextFactory)),
+                new ServletHolder(new AssignDrawManagerServlet(
+                        objectMapper,
+                        errorHandler,
+                        assignDrawManagerUseCase,
+                        adminWinningRuleUseCase,
+                        contextFactory)),
                 "/api/v1/admin/draws/*");
 
         Server server = new Server(properties.httpPort());

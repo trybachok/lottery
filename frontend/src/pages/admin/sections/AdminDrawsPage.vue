@@ -7,10 +7,13 @@ import { useAuthStore } from '@/features/auth/model/auth.store'
 import AdminDrawCreateForm from '@/features/admin-draws/ui/AdminDrawCreateForm.vue'
 import AdminDrawsTable from '@/features/admin-draws/ui/AdminDrawsTable.vue'
 import { useAdminDrawsStore } from '@/features/admin-draws/model/adminDraws.store'
+import AdminPrizesRulesPanel from '@/features/admin-prizes-rules/ui/AdminPrizesRulesPanel.vue'
+import { useAdminPrizesRulesStore } from '@/features/admin-prizes-rules/model/adminPrizesRules.store'
 import { hasPermission } from '@/shared/lib/permissions/hasPermission'
-import type { CreateDrawRequest } from '@/shared/api/generated/types.gen'
+import type { CreateDrawRequest, PrizeRequest, WinningRuleRequest } from '@/shared/api/generated/types.gen'
 
 const adminDrawsStore = useAdminDrawsStore()
+const adminPrizesRulesStore = useAdminPrizesRulesStore()
 const authStore = useAuthStore()
 
 const isAdmin = computed(() => authStore.roleCodes.includes('ADMIN'))
@@ -22,10 +25,21 @@ const canActivateDraw = computed(() => isAdmin.value || (isManager.value && hasP
 
 onMounted(() => {
   void adminDrawsStore.loadDraws()
+  if (canUpdateDraw.value) {
+    void adminPrizesRulesStore.loadPrizes()
+  }
 })
 
 async function createDraw(request: CreateDrawRequest): Promise<void> {
   await adminDrawsStore.createDraw(request)
+}
+
+async function savePrize(request: PrizeRequest): Promise<void> {
+  await adminPrizesRulesStore.savePrize(request)
+}
+
+async function saveRules(drawId: string, rules: WinningRuleRequest[]): Promise<void> {
+  await adminPrizesRulesStore.saveWinningRules(drawId, rules)
 }
 </script>
 
@@ -95,6 +109,27 @@ async function createDraw(request: CreateDrawRequest): Promise<void> {
       @generate-winning-combination="adminDrawsStore.generateWinningCombination"
       @run-draw="adminDrawsStore.runDraw"
       @assign-manager="adminDrawsStore.assignManager"
+    />
+
+    <AdminPrizesRulesPanel
+      v-if="canUpdateDraw"
+      :draws="adminDrawsStore.items"
+      :prizes="adminPrizesRulesStore.prizes"
+      :winning-rules="adminPrizesRulesStore.winningRules"
+      :selected-draw-id="adminPrizesRulesStore.selectedDrawId"
+      :editing-prize-id="adminPrizesRulesStore.editingPrizeId"
+      :loading-prizes="adminPrizesRulesStore.isLoadingPrizes"
+      :loading-rules="adminPrizesRulesStore.isLoadingRules"
+      :saving-prize="adminPrizesRulesStore.isSavingPrize"
+      :saving-rules="adminPrizesRulesStore.isSavingRules"
+      :error-message="adminPrizesRulesStore.error?.message"
+      :action-error-message="adminPrizesRulesStore.actionError?.message"
+      :feedback-message="adminPrizesRulesStore.lastSavedMessage"
+      @save-prize="savePrize"
+      @edit-prize="adminPrizesRulesStore.editPrize"
+      @cancel-prize-edit="adminPrizesRulesStore.clearPrizeEdit"
+      @load-rules="adminPrizesRulesStore.loadWinningRules"
+      @save-rules="saveRules"
     />
   </main>
 </template>

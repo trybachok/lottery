@@ -6,4 +6,12 @@ import java.util.UUID;
 
 public interface WinningRuleRepository {
     List<WinningRule> findByDrawIdOrderByPriority(UUID drawId);
+
+    default WinningRule save(WinningRule winningRule) {
+        throw new UnsupportedOperationException("Saving winning rules is not supported");
+    }
+
+    default void deleteByDrawId(UUID drawId) {
+        throw new UnsupportedOperationException("Deleting winning rules is not supported");
+    }
 }

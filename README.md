@@ -355,17 +355,14 @@ curl http://127.0.0.1:8090/api/v1/home-page
 ## Текущие особенности и ограничения
 
 - Первый admin пользователь не seed-ится миграциями: зарегистрируйте первым пользователя с логином `owner`, и backend автоматически назначит ему роль `ADMIN`.
-- UI для combination schemas, prizes и winning rules еще не выделен в отдельные админ-разделы; для полного сценария розыгрыша эти данные можно добавить через SQL или API/DB tooling.
+- Схема комбинации создаётся в форме создания тиража; призы и winning rules настраиваются в админке в разделе `Draws`.
 - Генерация выигрышной комбинации доступна в админке в разделе `Draws` кнопкой `Generate combination`, когда тираж находится в статусе `SALES_CLOSED`. После генерации тираж переходит в `DRAWING`, а комбинация сохраняется в `draw_results` и повторно не генерируется.
 - Frontend guards не заменяют backend RBAC: все реальные проверки прав выполняет backend.
 - `/docs` и `/api/v1/openapi.yaml` доступны только администратору.
 - Docker Compose публикует frontend на `127.0.0.1`, что подходит для локального запуска и production-схемы с reverse proxy.
 
 Ниже инструкция для **Сценария 1: базовая лотерея**. 
-Важно: в текущей версии проекта часть действий есть в UI, 
-но часть полного lifecycle пока удобнее выполнять через `curl` и SQL, 
-потому что в админке нет отдельных экранов для `combination_schemas`, `prizes`, `winning_rules`, 
-а закрытие продаж пока выполняется через `curl`. Активация тиража, генерация выигрышной комбинации и запуск розыгрыша доступны в админке.
+Важно: базовый lifecycle можно пройти через UI. `curl`-команды ниже оставлены как быстрый способ smoke-проверки API и диагностики.
 
 # Сценарий 1. Базовая лотерея
 
@@ -622,8 +619,6 @@ ACTIVE
 
 Для запуска розыгрыша backend требует наличие `winning_rules`.
 
-В UI этого пока нет, поэтому добавляем через SQL.
-
 Правило будет таким:
 
 ```text
@@ -631,46 +626,71 @@ ACTIVE
 иначе → билет LOSE
 ```
 
+Через интерфейс:
+
+```text
+http://127.0.0.1:8090/admin/draws
+```
+
+В нижнем блоке `Prizes` создайте приз:
+
+```text
+Type: Money
+Name: Demo main prize
+Amount: 1000
+Currency: RUB
+```
+
+В блоке `Winning rules`:
+
+```text
+Draw: выберите созданный тираж
+Match from: 100
+Match to: 100
+Prize: Demo main prize
+Priority: 1
+Add rule
+Save rules
+```
+
+Backend проверяет RBAC и статус тиража:
+
+- `ADMIN` может настраивать призы и правила для любого тиража;
+- `MANAGER` может настраивать winning rules только для назначенного ему тиража;
+- `CLIENT` не имеет доступа;
+- winning rules можно менять только до закрытия продаж: `DRAFT`, `SCHEDULED`, `ACTIVE`, `PAUSED`, `POSTPONED`;
+- после `SALES_CLOSED`, `DRAWING`, `COMPLETED`, `CANCELLED`, `ARCHIVED` или после генерации результата правила заблокированы.
+
+Через `curl`:
+
 ```bash
-export PRIZE_ID="22222222-2222-2222-2222-222222222222"
+PRIZE_RESPONSE=$(curl -s -X POST "$BASE/admin/prizes" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{
+    "type": "MONEY",
+    "name": "Demo main prize",
+    "amount": 1000,
+    "currency": "RUB"
+  }')
 
-docker compose --env-file .env.example exec -T postgres psql -U lottery -d lottery <<SQL
-insert into prizes (
-  id,
-  type,
-  name,
-  amount,
-  currency
-)
-values (
-  '$PRIZE_ID',
-  'MONEY',
-  'Demo main prize',
-  1000.00,
-  'RUB'
-)
-on conflict (id) do nothing;
+echo "$PRIZE_RESPONSE" | jq
 
-delete from winning_rules
-where draw_id = '$DRAW_ID';
+export PRIZE_ID=$(echo "$PRIZE_RESPONSE" | jq -r '.id')
 
-insert into winning_rules (
-  id,
-  draw_id,
-  match_percent_from,
-  match_percent_to,
-  prize_id,
-  priority
-)
-values (
-  gen_random_uuid(),
-  '$DRAW_ID',
-  100.00,
-  100.00,
-  '$PRIZE_ID',
-  1
-);
-SQL
+curl -s -X PUT "$BASE/admin/draws/$DRAW_ID/winning-rules" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d "{
+    \"rules\": [
+      {
+        \"matchPercentFrom\": 100,
+        \"matchPercentTo\": 100,
+        \"prizeId\": \"$PRIZE_ID\",
+        \"priority\": 1
+      }
+    ]
+  }" | jq
 ```
 
 ---
@@ -1213,6 +1233,13 @@ http://127.0.0.1:8090/admin/draws
 
 В строке созданного тиража нажмите `Activate`.
 Кнопка доступна администратору или менеджеру, который назначен на этот тираж.
+
+После активации настройте приз и winning rule на этой же странице:
+
+```text
+Prizes → создать Demo main prize
+Winning rules → выбрать draw → добавить правило 100..100% → Save rules
+```
 
 Альтернатива через API:
 

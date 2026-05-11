@@ -29,6 +29,8 @@ tags:
     description: Administrative roles, permissions and assignments.
   - name: Admin Draws
     description: Administrative draw ownership actions.
+  - name: Admin Prizes
+    description: Administrative prize management.
   - name: Admin Settings
     description: Administrative system settings.
   - name: Admin UI Themes
@@ -1669,6 +1671,165 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Draw'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /admin/draws/{drawId}/winning-rules:
+    get:
+      tags: [Admin Draws]
+      operationId: adminListDrawWinningRules
+      summary: Admin list draw winning rules
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      responses:
+        '200':
+          description: Draw winning rules
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WinningRuleListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [Admin Draws]
+      operationId: adminReplaceDrawWinningRules
+      summary: Admin replace draw winning rules
+      description: Replaces all winning rules for an editable draw. Rules can be changed before sales are closed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/DrawIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WinningRuleListRequest'
+      responses:
+        '200':
+          description: Draw winning rules updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WinningRuleListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /admin/prizes:
+    get:
+      tags: [Admin Prizes]
+      operationId: adminListPrizes
+      summary: Admin list prizes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Prize list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrizeListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Admin Prizes]
+      operationId: adminCreatePrize
+      summary: Admin create prize
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrizeRequest'
+      responses:
+        '201':
+          description: Prize created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prize'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin/prizes/{prizeId}:
+    get:
+      tags: [Admin Prizes]
+      operationId: adminGetPrize
+      summary: Admin get prize
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PrizeIdPath'
+      responses:
+        '200':
+          description: Prize
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prize'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    put:
+      tags: [Admin Prizes]
+      operationId: adminUpdatePrize
+      summary: Admin update prize
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PrizeIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrizeRequest'
+      responses:
+        '200':
+          description: Prize updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prize'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -1719,6 +1880,13 @@ components:
         format: uuid
     DrawIdPath:
       name: drawId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PrizeIdPath:
+      name: prizeId
       in: path
       required: true
       schema:
@@ -2046,6 +2214,125 @@ components:
         managerId:
           type: string
           format: uuid
+    PrizeType:
+      type: string
+      enum: [MONEY, FOOD_PRODUCT, SPORT_SUPPLEMENT]
+    Prize:
+      type: object
+      required: [id, type, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/PrizeType'
+        name:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: number
+        unit:
+          type: string
+    PrizeRequest:
+      type: object
+      required: [type, name]
+      properties:
+        type:
+          $ref: '#/components/schemas/PrizeType'
+        name:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        productId:
+          type: string
+          format: uuid
+        quantity:
+          type: number
+        unit:
+          type: string
+    PrizeListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Prize'
+    WinningRule:
+      type: object
+      required: [id, drawId, matchPercentFrom, matchPercentTo, prizeId, priority]
+      properties:
+        id:
+          type: string
+          format: uuid
+        drawId:
+          type: string
+          format: uuid
+        matchPercentFrom:
+          type: number
+          minimum: 0
+          maximum: 100
+          multipleOf: 5
+        matchPercentTo:
+          type: number
+          minimum: 0
+          maximum: 100
+          multipleOf: 5
+        prizeId:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+          minimum: 0
+    WinningRuleRequest:
+      type: object
+      required: [matchPercentFrom, matchPercentTo, prizeId, priority]
+      properties:
+        matchPercentFrom:
+          type: number
+          minimum: 0
+          maximum: 100
+          multipleOf: 5
+        matchPercentTo:
+          type: number
+          minimum: 0
+          maximum: 100
+          multipleOf: 5
+        prizeId:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+          minimum: 0
+    WinningRuleListRequest:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/WinningRuleRequest'
+    WinningRuleListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WinningRule'
     RegisterRequest:
       type: object
       required: [email, password]

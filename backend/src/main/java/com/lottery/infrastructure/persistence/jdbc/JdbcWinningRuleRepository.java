@@ -47,4 +47,41 @@ public final class JdbcWinningRuleRepository implements WinningRuleRepository {
             throw new IllegalStateException("Failed to list winning rules", exception);
         }
     }
+
+    @Override
+    public WinningRule save(WinningRule winningRule) {
+        String sql = """
+                insert into winning_rules (id, draw_id, match_percent_from, match_percent_to, prize_id, priority)
+                values (?, ?, ?, ?, ?, ?)
+                """;
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, winningRule.id());
+                statement.setObject(2, winningRule.drawId());
+                statement.setBigDecimal(3, winningRule.matchPercentFrom());
+                statement.setBigDecimal(4, winningRule.matchPercentTo());
+                statement.setObject(5, winningRule.prizeId());
+                statement.setInt(6, winningRule.priority());
+                statement.executeUpdate();
+                return winningRule;
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to save winning rule", exception);
+        }
+    }
+
+    @Override
+    public void deleteByDrawId(UUID drawId) {
+        String sql = "delete from winning_rules where draw_id = ?";
+        try {
+            Connection connection = connectionProvider.currentConnection();
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setObject(1, drawId);
+                statement.executeUpdate();
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to delete winning rules", exception);
+        }
+    }
 }

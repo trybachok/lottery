@@ -39,6 +39,12 @@ async function refreshInvoice(): Promise<void> {
   }
 }
 
+async function simulateMockWebhook(eventType: 'PAYMENT_SUCCEEDED' | 'PAYMENT_FAILED'): Promise<void> {
+  if (ticketsStore.selectedInvoice?.id) {
+    await ticketsStore.simulateMockWebhook(ticketsStore.selectedInvoice.id, eventType)
+  }
+}
+
 async function checkResult(): Promise<void> {
   if (ticketsStore.selectedTicket) {
     await ticketsStore.checkResult(ticketsStore.selectedTicket.id)
@@ -65,9 +71,11 @@ async function checkResult(): Promise<void> {
       <InvoiceStatusPanel
         :invoice="ticketsStore.selectedInvoice"
         :loading="ticketsStore.invoiceLoadingTicketId === ticketsStore.selectedTicket.id"
+        :mock-webhook-loading="ticketsStore.mockWebhookLoadingInvoiceId === ticketsStore.selectedInvoice?.id"
         :can-create="ticketsStore.selectedTicket.status === 'CREATED'"
         @create-invoice="createInvoice"
         @refresh-invoice="refreshInvoice"
+        @simulate-mock-webhook="simulateMockWebhook"
       />
 
       <AppErrorMessage

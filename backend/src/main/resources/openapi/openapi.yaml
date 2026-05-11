@@ -803,6 +803,44 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /invoices/{invoiceId}/mock-webhook:
+    post:
+      tags: [Payments]
+      operationId: simulateMockPaymentWebhook
+      summary: Simulate mock payment webhook for invoice
+      description: Demo helper that signs and processes a mock provider webhook for a pending mock invoice.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: invoiceId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Mock webhook processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentWebhookResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MockPaymentWebhookRequest'
   /payments/{paymentId}/refund:
     post:
       tags: [Payments]
@@ -2504,6 +2542,13 @@ components:
         idempotencyKey:
           type: string
           minLength: 1
+    MockPaymentWebhookRequest:
+      type: object
+      required: [eventType]
+      properties:
+        eventType:
+          type: string
+          enum: [PAYMENT_SUCCEEDED, PAYMENT_FAILED]
     PaymentWebhookPayload:
       type: object
       required: [eventId, eventType, externalInvoiceId]

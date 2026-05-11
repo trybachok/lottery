@@ -6,11 +6,14 @@ import {
   getTicketById,
   getTicketInvoice,
   getTickets,
+  simulateMockPaymentWebhook,
 } from '@/shared/api/generated/sdk.gen'
 import type {
   CreateInvoiceRequest,
   CreateTicketRequest,
   Invoice,
+  MockPaymentWebhookRequest,
+  PaymentWebhookResult,
   Ticket,
 } from '@/shared/api/generated/types.gen'
 
@@ -69,6 +72,19 @@ export async function getLatestTicketInvoice(ticketId: string): Promise<Invoice>
 export async function getInvoice(invoiceId: string): Promise<Invoice> {
   const response = await getInvoiceById({
     path: { invoiceId },
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function sendMockPaymentWebhook(
+  invoiceId: string,
+  eventType: MockPaymentWebhookRequest['eventType'],
+): Promise<PaymentWebhookResult> {
+  const response = await simulateMockPaymentWebhook({
+    path: { invoiceId },
+    body: { eventType },
     throwOnError: true,
   })
 

@@ -1,7 +1,13 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { mapApiError, type FrontendApiError } from '@/shared/api/errors'
-import type { CreateTicketRequest, Invoice, Ticket } from '@/shared/api/generated/types.gen'
+import type {
+  CreateTicketRequest,
+  Invoice,
+  MockPaymentWebhookRequest,
+  PaymentWebhookResult,
+  Ticket,
+} from '@/shared/api/generated/types.gen'
 import {
   checkClientTicketResult,
   createClientTicket,
@@ -10,6 +16,7 @@ import {
   getInvoice,
   getLatestTicketInvoice,
   listTickets,
+  sendMockPaymentWebhook,
 } from '../api/tickets.api'
 
 export const useTicketsStore = defineStore('tickets', () => {
@@ -21,6 +28,7 @@ export const useTicketsStore = defineStore('tickets', () => {
   const isLoadingDetails = ref(false)
   const isCreating = ref(false)
   const invoiceLoadingTicketId = ref<string | null>(null)
+  const mockWebhookLoadingInvoiceId = ref<string | null>(null)
   const isCheckingResult = ref(false)
   const error = ref<FrontendApiError | null>(null)
   const detailsError = ref<FrontendApiError | null>(null)
@@ -140,6 +148,32 @@ export const useTicketsStore = defineStore('tickets', () => {
     }
   }
 
+  async function simulateMockWebhook(
+    invoiceId: string,
+    eventType: MockPaymentWebhookRequest['eventType'],
+  ): Promise<PaymentWebhookResult | null> {
+    mockWebhookLoadingInvoiceId.value = invoiceId
+    actionError.value = null
+
+    try {
+      const result = await sendMockPaymentWebhook(invoiceId, eventType)
+      const invoice = await refreshInvoice(invoiceId)
+      if (invoice) {
+        const ticket = await getClientTicket(invoice.ticketId)
+        items.value = items.value.map((item) => (item.id === ticket.id ? ticket : item))
+        if (selectedTicket.value?.id === ticket.id) {
+          selectedTicket.value = ticket
+        }
+      }
+      return result
+    } catch (caughtError) {
+      actionError.value = mapApiError(caughtError)
+      return null
+    } finally {
+      mockWebhookLoadingInvoiceId.value = null
+    }
+  }
+
   async function checkResult(ticketId: string): Promise<Ticket | null> {
     isCheckingResult.value = true
     actionError.value = null
@@ -172,6 +206,7 @@ export const useTicketsStore = defineStore('tickets', () => {
     isLoadingDetails,
     isCreating,
     invoiceLoadingTicketId,
+    mockWebhookLoadingInvoiceId,
     isCheckingResult,
     error,
     detailsError,
@@ -182,6 +217,7 @@ export const useTicketsStore = defineStore('tickets', () => {
     createInvoice,
     refreshTicketInvoice,
     refreshInvoice,
+    simulateMockWebhook,
     checkResult,
     clearActionError,
   }

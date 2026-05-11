@@ -33,6 +33,7 @@ import com.lottery.application.usecase.payment.GetTicketInvoiceUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentOutboxUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
+import com.lottery.application.usecase.payment.SimulateMockPaymentWebhookUseCase;
 import com.lottery.application.usecase.report.GenerateDrawReportUseCase;
 import com.lottery.application.usecase.report.GenerateTicketReportUseCase;
 import com.lottery.application.usecase.system.GetOpenApiDocumentUseCase;
@@ -343,6 +344,14 @@ public final class ApplicationConfig {
                 transactionManager,
                 clock,
                 objectMapper);
+        SimulateMockPaymentWebhookUseCase simulateMockPaymentWebhookUseCase = new SimulateMockPaymentWebhookUseCase(
+                invoiceRepository,
+                authorizationPort,
+                transactionManager,
+                processPaymentWebhookUseCase,
+                paymentProvider,
+                clock,
+                objectMapper);
         RefundPaymentUseCase refundPaymentUseCase = new RefundPaymentUseCase(
                 paymentRepository,
                 invoiceRepository,
@@ -477,6 +486,7 @@ public final class ApplicationConfig {
                         getInvoiceUseCase,
                         cancelInvoiceUseCase,
                         expireInvoiceUseCase,
+                        simulateMockPaymentWebhookUseCase,
                         contextFactory)),
                 "/api/v1/invoices/*");
         context.addServlet(

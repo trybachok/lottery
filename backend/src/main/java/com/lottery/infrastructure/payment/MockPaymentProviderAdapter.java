@@ -2,6 +2,7 @@ package com.lottery.infrastructure.payment;
 
 import com.lottery.application.ApplicationException;
 import com.lottery.application.port.payment.PaymentProviderPort;
+import com.lottery.application.port.payment.WebhookSignatureGeneratorPort;
 import com.lottery.application.port.payment.WebhookSignatureVerifierPort;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -9,7 +10,7 @@ import java.util.HexFormat;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
-public final class MockPaymentProviderAdapter implements PaymentProviderPort, WebhookSignatureVerifierPort {
+public final class MockPaymentProviderAdapter implements PaymentProviderPort, WebhookSignatureVerifierPort, WebhookSignatureGeneratorPort {
     public static final String PROVIDER_CODE = "mock";
 
     private final String webhookSecret;
@@ -56,6 +57,14 @@ public final class MockPaymentProviderAdapter implements PaymentProviderPort, We
         }
         String expected = hmacSha256(payload);
         return MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Override
+    public String sign(String providerCode, String payload) {
+        if (!PROVIDER_CODE.equals(providerCode)) {
+            throw new ApplicationException("PAYMENT_PROVIDER_NOT_CONFIGURED", "Payment provider adapter is not configured");
+        }
+        return hmacSha256(payload);
     }
 
     private String hmacSha256(String payload) {

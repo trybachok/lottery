@@ -1699,6 +1699,24 @@ Mock provider требует HMAC SHA-256 подпись в заголовке:
 X-Mock-Signature
 ```
 
+Через интерфейс вручную считать подпись не нужно. Откройте детали билета:
+
+```text
+Account → Details
+```
+
+Когда invoice уже обработан payment outbox и перешёл в `PENDING`, в блоке `Payment status` появятся кнопки:
+
+```text
+Mark paid
+Mark failed
+```
+
+`Mark paid` отправляет demo-событие `PAYMENT_SUCCEEDED`, `Mark failed` отправляет demo-событие `PAYMENT_FAILED`.
+Backend сам формирует mock webhook payload, подписывает его серверным `LOTTERY_MOCK_PAYMENT_WEBHOOK_SECRET` и обрабатывает через обычный webhook pipeline.
+
+Для проверки через `curl` можно использовать функцию ниже.
+
 Секрет берём из `.env.example`:
 
 ```bash

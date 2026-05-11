@@ -6,12 +6,14 @@ import type { Invoice } from '@/shared/api/generated/types.gen'
 defineProps<{
   invoice: Invoice | null
   loading?: boolean
+  mockWebhookLoading?: boolean
   canCreate?: boolean
 }>()
 
 defineEmits<{
   createInvoice: []
   refreshInvoice: []
+  simulateMockWebhook: [eventType: 'PAYMENT_SUCCEEDED' | 'PAYMENT_FAILED']
 }>()
 
 function formatDate(value?: string): string {
@@ -71,6 +73,26 @@ function formatDate(value?: string): string {
     >
       Payment page
     </a>
+
+    <div v-if="invoice?.externalInvoiceId && invoice.status === 'PENDING'" class="invoice-status-panel__mock-actions">
+      <BaseButton
+        size="sm"
+        :loading="mockWebhookLoading"
+        title="Send PAYMENT_SUCCEEDED mock webhook"
+        @click="$emit('simulateMockWebhook', 'PAYMENT_SUCCEEDED')"
+      >
+        Mark paid
+      </BaseButton>
+      <BaseButton
+        size="sm"
+        variant="danger"
+        :loading="mockWebhookLoading"
+        title="Send PAYMENT_FAILED mock webhook"
+        @click="$emit('simulateMockWebhook', 'PAYMENT_FAILED')"
+      >
+        Mark failed
+      </BaseButton>
+    </div>
   </BaseCard>
 </template>
 
@@ -111,6 +133,13 @@ dd {
 
 .invoice-status-panel__payment-link:hover {
   text-decoration: underline;
+}
+
+.invoice-status-panel__mock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 @media (max-width: 640px) {

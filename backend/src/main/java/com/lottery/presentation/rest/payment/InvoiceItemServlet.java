@@ -3,9 +3,11 @@ package com.lottery.presentation.rest.payment;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lottery.application.NotFoundException;
 import com.lottery.application.command.CancelInvoiceCommand;
+import com.lottery.application.command.SimulateMockPaymentWebhookCommand;
 import com.lottery.application.usecase.payment.CancelInvoiceUseCase;
 import com.lottery.application.usecase.payment.ExpireInvoiceUseCase;
 import com.lottery.application.usecase.payment.GetInvoiceUseCase;
+import com.lottery.application.usecase.payment.SimulateMockPaymentWebhookUseCase;
 import com.lottery.presentation.error.GlobalErrorHandler;
 import com.lottery.presentation.rest.JsonServlet;
 import com.lottery.presentation.rest.ServletUseCaseContextFactory;
@@ -18,6 +20,7 @@ public final class InvoiceItemServlet extends JsonServlet {
     private final GetInvoiceUseCase getInvoiceUseCase;
     private final CancelInvoiceUseCase cancelInvoiceUseCase;
     private final ExpireInvoiceUseCase expireInvoiceUseCase;
+    private final SimulateMockPaymentWebhookUseCase simulateMockPaymentWebhookUseCase;
     private final ServletUseCaseContextFactory contextFactory;
 
     public InvoiceItemServlet(
@@ -26,11 +29,13 @@ public final class InvoiceItemServlet extends JsonServlet {
             GetInvoiceUseCase getInvoiceUseCase,
             CancelInvoiceUseCase cancelInvoiceUseCase,
             ExpireInvoiceUseCase expireInvoiceUseCase,
+            SimulateMockPaymentWebhookUseCase simulateMockPaymentWebhookUseCase,
             ServletUseCaseContextFactory contextFactory) {
         super(objectMapper, errorHandler);
         this.getInvoiceUseCase = getInvoiceUseCase;
         this.cancelInvoiceUseCase = cancelInvoiceUseCase;
         this.expireInvoiceUseCase = expireInvoiceUseCase;
+        this.simulateMockPaymentWebhookUseCase = simulateMockPaymentWebhookUseCase;
         this.contextFactory = contextFactory;
     }
 
@@ -65,6 +70,15 @@ public final class InvoiceItemServlet extends JsonServlet {
                                     contextFactory.from(request)));
                 }
                 case "expire" -> writeJson(response, 200, expireInvoiceUseCase.execute(path.invoiceId(), contextFactory.from(request)));
+                case "mock-webhook" -> {
+                    MockWebhookRequest body = readJson(request, MockWebhookRequest.class);
+                    writeJson(
+                            response,
+                            200,
+                            simulateMockPaymentWebhookUseCase.execute(
+                                    new SimulateMockPaymentWebhookCommand(path.invoiceId(), body.eventType()),
+                                    contextFactory.from(request)));
+                }
                 default -> throw new NotFoundException("Endpoint");
             }
         } catch (Exception exception) {
@@ -85,6 +99,9 @@ public final class InvoiceItemServlet extends JsonServlet {
     }
 
     public record IdempotencyRequest(String idempotencyKey) {
+    }
+
+    public record MockWebhookRequest(String eventType) {
     }
 
     private record PathParts(UUID invoiceId, String action) {

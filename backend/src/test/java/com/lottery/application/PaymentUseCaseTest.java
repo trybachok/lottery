@@ -9,10 +9,12 @@ import com.lottery.application.command.CancelInvoiceCommand;
 import com.lottery.application.command.CreateInvoiceForTicketCommand;
 import com.lottery.application.command.ProcessPaymentWebhookCommand;
 import com.lottery.application.command.RefundPaymentCommand;
+import com.lottery.application.command.SimulateMockPaymentWebhookCommand;
 import com.lottery.application.mapper.InvoiceMapper;
 import com.lottery.application.mapper.PaymentMapper;
 import com.lottery.application.port.auth.AuthorizationPort;
 import com.lottery.application.port.payment.PaymentProviderPort;
+import com.lottery.application.port.payment.WebhookSignatureGeneratorPort;
 import com.lottery.application.port.payment.WebhookSignatureVerifierPort;
 import com.lottery.application.port.transaction.TransactionManager;
 import com.lottery.application.usecase.payment.CancelInvoiceUseCase;
@@ -23,6 +25,7 @@ import com.lottery.application.usecase.payment.GetTicketInvoiceUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentOutboxUseCase;
 import com.lottery.application.usecase.payment.ProcessPaymentWebhookUseCase;
 import com.lottery.application.usecase.payment.RefundPaymentUseCase;
+import com.lottery.application.usecase.payment.SimulateMockPaymentWebhookUseCase;
 import com.lottery.domain.model.Invoice;
 import com.lottery.domain.model.Payment;
 import com.lottery.domain.model.PaymentOutboxMessage;
@@ -132,6 +135,71 @@ final class PaymentUseCaseTest {
         assertEquals("https://mock-payments.test/invoices/ext-inv-" + ticket.id(), invoices.byId.get(invoiceDto.id()).maybePaymentUrl().orElseThrow());
         assertEquals("ext-pay-" + ticket.id(), payments.findByInvoiceId(invoiceDto.id()).orElseThrow().maybeExternalPaymentId().orElseThrow());
         assertEquals(PaymentOutboxStatus.PROCESSED, outbox.byId.values().iterator().next().status());
+    }
+
+    @Test
+    void simulateMockPaymentWebhookSignsAndProcessesPendingInvoice() {
+        UUID userId = UUID.randomUUID();
+        Ticket ticket = ticket(userId, TicketStatus.CREATED);
+        InMemoryTicketRepository tickets = new InMemoryTicketRepository(List.of(ticket));
+        InMemoryInvoiceRepository invoices = new InMemoryInvoiceRepository();
+        InMemoryPaymentRepository payments = new InMemoryPaymentRepository();
+        InMemoryPaymentOutboxRepository outbox = new InMemoryPaymentOutboxRepository();
+        InMemoryPaymentWebhookEventRepository webhookEvents = new InMemoryPaymentWebhookEventRepository();
+        FakePaymentProvider provider = new FakePaymentProvider();
+        ObjectMapper objectMapper = new ObjectMapper();
+        CreateInvoiceForTicketUseCase createUseCase = new CreateInvoiceForTicketUseCase(
+                tickets,
+                invoices,
+                payments,
+                outbox,
+                grantAll(),
+                directTransaction(),
+                fixedClock(),
+                new InvoiceMapper());
+        ProcessPaymentOutboxUseCase outboxUseCase = new ProcessPaymentOutboxUseCase(
+                outbox,
+                invoices,
+                payments,
+                tickets,
+                provider,
+                directTransaction(),
+                fixedClock(),
+                objectMapper);
+        ProcessPaymentWebhookUseCase webhookUseCase = new ProcessPaymentWebhookUseCase(
+                webhookEvents,
+                invoices,
+                payments,
+                tickets,
+                signatureVerifier(true),
+                directTransaction(),
+                fixedClock(),
+                objectMapper);
+        SimulateMockPaymentWebhookUseCase simulateUseCase = new SimulateMockPaymentWebhookUseCase(
+                invoices,
+                grantAll(),
+                directTransaction(),
+                webhookUseCase,
+                signatureGenerator(),
+                fixedClock(),
+                objectMapper);
+
+        var invoiceDto = createUseCase.execute(
+                new CreateInvoiceForTicketCommand(ticket.id(), "mock", "invoice-idem-1"),
+                new UseCaseContext(userId, Set.of(PermissionCodes.TICKET_CREATE, PermissionCodes.PAYMENT_READ), "req_test"));
+        outboxUseCase.executeDue(10);
+
+        var result = simulateUseCase.execute(
+                new SimulateMockPaymentWebhookCommand(invoiceDto.id(), "PAYMENT_SUCCEEDED"),
+                new UseCaseContext(userId, Set.of(PermissionCodes.PAYMENT_READ), "req_test"));
+
+        assertTrue(result.processed());
+        assertFalse(result.duplicate());
+        assertEquals("PAYMENT_SUCCEEDED", result.status());
+        assertEquals(InvoiceStatus.PAID, invoices.byId.get(invoiceDto.id()).status());
+        assertEquals(PaymentStatus.CAPTURED, payments.findByInvoiceId(invoiceDto.id()).orElseThrow().status());
+        assertEquals(TicketStatus.PAID, tickets.byId.get(ticket.id()).status());
+        assertEquals(1, webhookEvents.byId.size());
     }
 
     @Test
@@ -507,6 +575,10 @@ final class PaymentUseCaseTest {
 
     private static WebhookSignatureVerifierPort signatureVerifier(boolean valid) {
         return (providerCode, payload, signature) -> valid;
+    }
+
+    private static WebhookSignatureGeneratorPort signatureGenerator() {
+        return (providerCode, payload) -> "valid-signature";
     }
 
     private static final class FakePaymentProvider implements PaymentProviderPort {

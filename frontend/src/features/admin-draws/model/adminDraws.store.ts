@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { mapApiError, type FrontendApiError } from '@/shared/api/errors'
 import type { CreateDrawRequest, Draw, DrawResult, RunDrawResponse } from '@/shared/api/generated/types.gen'
 import {
+  activateAdminDraw,
   assignDrawManager,
   createAdminDraw,
   generateAdminWinningCombination,
@@ -16,6 +17,7 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
   const lastGeneratedResult = ref<DrawResult | null>(null)
   const isLoading = ref(false)
   const isCreating = ref(false)
+  const activatingDrawId = ref<string | null>(null)
   const generatingDrawId = ref<string | null>(null)
   const runningDrawId = ref<string | null>(null)
   const assigningManagerDrawId = ref<string | null>(null)
@@ -48,6 +50,22 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
       return null
     } finally {
       isCreating.value = false
+    }
+  }
+
+  async function activateDraw(drawId: string): Promise<Draw | null> {
+    activatingDrawId.value = drawId
+    actionError.value = null
+
+    try {
+      const draw = await activateAdminDraw(drawId)
+      items.value = items.value.map((item) => (item.id === draw.id ? draw : item))
+      return draw
+    } catch (caughtError) {
+      actionError.value = mapApiError(caughtError)
+      return null
+    } finally {
+      activatingDrawId.value = null
     }
   }
 
@@ -113,6 +131,7 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
     lastGeneratedResult,
     isLoading,
     isCreating,
+    activatingDrawId,
     generatingDrawId,
     runningDrawId,
     assigningManagerDrawId,
@@ -120,6 +139,7 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
     actionError,
     loadDraws,
     createDraw,
+    activateDraw,
     generateWinningCombination,
     runDraw,
     assignManager,

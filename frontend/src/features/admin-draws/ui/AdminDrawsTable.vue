@@ -8,15 +8,21 @@ import type { Draw } from '@/shared/api/generated/types.gen'
 
 const props = defineProps<{
   draws: Draw[]
+  activatingDrawId?: string | null
   generatingDrawId?: string | null
   runningDrawId?: string | null
   assigningManagerDrawId?: string | null
+  currentUserId?: string
+  isAdmin?: boolean
+  isManager?: boolean
+  canActivate?: boolean
   canGenerate?: boolean
   canRun?: boolean
   canAssignManager?: boolean
 }>()
 
 const emit = defineEmits<{
+  activateDraw: [drawId: string]
   generateWinningCombination: [drawId: string]
   runDraw: [drawId: string]
   assignManager: [drawId: string, managerId: string]
@@ -57,6 +63,30 @@ function canRunByStatus(draw: Draw): boolean {
 function canGenerateByStatus(draw: Draw): boolean {
   return draw.status === 'SALES_CLOSED'
 }
+
+function canActivateByStatus(draw: Draw): boolean {
+  return ['DRAFT', 'SCHEDULED', 'PAUSED', 'POSTPONED'].includes(draw.status)
+}
+
+function canActivateByAccess(draw: Draw): boolean {
+  if (!props.canActivate) {
+    return false
+  }
+  if (props.isAdmin) {
+    return true
+  }
+  return Boolean(props.isManager && props.currentUserId && draw.managerId === props.currentUserId)
+}
+
+function activateDisabledReason(draw: Draw): string | undefined {
+  if (!canActivateByStatus(draw)) {
+    return 'Draw cannot be activated from this status.'
+  }
+  if (!canActivateByAccess(draw)) {
+    return 'Only an administrator or the assigned draw manager can activate this draw.'
+  }
+  return undefined
+}
 </script>
 
 <template>
@@ -91,7 +121,18 @@ function canGenerateByStatus(draw: Draw): boolean {
       </template>
 
       <template #actions="{ row }">
-        <div v-if="props.canGenerate || props.canRun" class="admin-draws-table__actions">
+        <div v-if="props.canActivate || props.canGenerate || props.canRun" class="admin-draws-table__actions">
+          <BaseButton
+            v-if="canActivateByStatus(row)"
+            size="sm"
+            variant="secondary"
+            :disabled="!canActivateByAccess(row)"
+            :loading="activatingDrawId === row.id"
+            :title="activateDisabledReason(row)"
+            @click="$emit('activateDraw', row.id)"
+          >
+            Activate
+          </BaseButton>
           <BaseButton
             v-if="props.canGenerate"
             size="sm"

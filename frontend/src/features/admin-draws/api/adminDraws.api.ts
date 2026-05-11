@@ -1,4 +1,5 @@
 import {
+  activateDraw,
   adminAssignDrawManager,
   createDraw,
   generateWinningCombination,
@@ -25,6 +26,17 @@ export async function listAdminDraws(params: { limit?: number; offset?: number }
 export async function createAdminDraw(request: CreateDrawRequest): Promise<Draw> {
   const response = await createDraw({
     body: request,
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function activateAdminDraw(drawId: string): Promise<Draw> {
+  const response = await activateDraw({
+    path: {
+      drawId,
+    },
     throwOnError: true,
   })
 

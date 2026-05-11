@@ -14,9 +14,11 @@ const adminDrawsStore = useAdminDrawsStore()
 const authStore = useAuthStore()
 
 const isAdmin = computed(() => authStore.roleCodes.includes('ADMIN'))
+const isManager = computed(() => authStore.roleCodes.includes('MANAGER'))
 const canCreateDraw = computed(() => isAdmin.value || hasPermission(authStore.permissions, ['draw.create']))
 const canUpdateDraw = computed(() => isAdmin.value || hasPermission(authStore.permissions, ['draw.update']))
 const canRunDraw = computed(() => isAdmin.value || hasPermission(authStore.permissions, ['draw.run']))
+const canActivateDraw = computed(() => isAdmin.value || (isManager.value && hasPermission(authStore.permissions, ['draw.update'])))
 
 onMounted(() => {
   void adminDrawsStore.loadDraws()
@@ -75,12 +77,18 @@ async function createDraw(request: CreateDrawRequest): Promise<void> {
     <AdminDrawsTable
       v-else
       :draws="adminDrawsStore.items"
+      :activating-draw-id="adminDrawsStore.activatingDrawId"
       :generating-draw-id="adminDrawsStore.generatingDrawId"
       :running-draw-id="adminDrawsStore.runningDrawId"
       :assigning-manager-draw-id="adminDrawsStore.assigningManagerDrawId"
+      :current-user-id="authStore.user?.id"
+      :is-admin="isAdmin"
+      :is-manager="isManager"
+      :can-activate="canActivateDraw"
       :can-generate="canRunDraw"
       :can-run="canRunDraw"
       :can-assign-manager="canUpdateDraw"
+      @activate-draw="adminDrawsStore.activateDraw"
       @generate-winning-combination="adminDrawsStore.generateWinningCombination"
       @run-draw="adminDrawsStore.runDraw"
       @assign-manager="adminDrawsStore.assignManager"

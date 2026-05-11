@@ -942,6 +942,17 @@ SALES_CLOSED
 
 Закрыть продажи:
 
+Через интерфейс:
+
+```text
+http://127.0.0.1:8090/admin/draws
+```
+
+Найдите тираж со статусом `ACTIVE` и нажмите `Close sales`.
+Кнопка активна для `ADMIN` или назначенного на этот тираж `MANAGER`; если прав нет, кнопка будет заблокирована.
+
+Через `curl`:
+
 ```bash
 curl -s -X POST "$BASE/draws/$DRAW_ID/close-sales" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq

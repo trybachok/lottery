@@ -9,6 +9,7 @@ import type { Draw } from '@/shared/api/generated/types.gen'
 const props = defineProps<{
   draws: Draw[]
   activatingDrawId?: string | null
+  closingSalesDrawId?: string | null
   generatingDrawId?: string | null
   runningDrawId?: string | null
   assigningManagerDrawId?: string | null
@@ -16,6 +17,7 @@ const props = defineProps<{
   isAdmin?: boolean
   isManager?: boolean
   canActivate?: boolean
+  canCloseSales?: boolean
   canGenerate?: boolean
   canRun?: boolean
   canAssignManager?: boolean
@@ -23,6 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   activateDraw: [drawId: string]
+  closeSales: [drawId: string]
   generateWinningCombination: [drawId: string]
   runDraw: [drawId: string]
   assignManager: [drawId: string, managerId: string]
@@ -68,12 +71,16 @@ function canActivateByStatus(draw: Draw): boolean {
   return ['DRAFT', 'SCHEDULED', 'PAUSED', 'POSTPONED'].includes(draw.status)
 }
 
-function hasVisibleActions(draw: Draw): boolean {
-  return canActivateByStatus(draw) || Boolean(props.canGenerate || props.canRun)
+function canCloseSalesByStatus(draw: Draw): boolean {
+  return draw.status === 'ACTIVE'
 }
 
-function canActivateByAccess(draw: Draw): boolean {
-  if (!props.canActivate) {
+function hasVisibleActions(draw: Draw): boolean {
+  return canActivateByStatus(draw) || canCloseSalesByStatus(draw) || Boolean(props.canGenerate || props.canRun)
+}
+
+function canManageLifecycleByAccess(draw: Draw, allowed?: boolean): boolean {
+  if (!allowed) {
     return false
   }
   if (props.isAdmin) {
@@ -82,12 +89,30 @@ function canActivateByAccess(draw: Draw): boolean {
   return Boolean(props.isManager && props.currentUserId && draw.managerId === props.currentUserId)
 }
 
+function canActivateByAccess(draw: Draw): boolean {
+  return canManageLifecycleByAccess(draw, props.canActivate)
+}
+
+function canCloseSalesByAccess(draw: Draw): boolean {
+  return canManageLifecycleByAccess(draw, props.canCloseSales)
+}
+
 function activateDisabledReason(draw: Draw): string | undefined {
   if (!canActivateByStatus(draw)) {
     return 'Draw cannot be activated from this status.'
   }
   if (!canActivateByAccess(draw)) {
     return 'Only an administrator or the assigned draw manager can activate this draw.'
+  }
+  return undefined
+}
+
+function closeSalesDisabledReason(draw: Draw): string | undefined {
+  if (!canCloseSalesByStatus(draw)) {
+    return 'Sales can be closed only for ACTIVE draw.'
+  }
+  if (!canCloseSalesByAccess(draw)) {
+    return 'Only an administrator or the assigned draw manager can close sales.'
   }
   return undefined
 }
@@ -136,6 +161,17 @@ function activateDisabledReason(draw: Draw): string | undefined {
             @click="$emit('activateDraw', row.id)"
           >
             Activate
+          </BaseButton>
+          <BaseButton
+            v-if="canCloseSalesByStatus(row)"
+            size="sm"
+            variant="secondary"
+            :disabled="!canCloseSalesByAccess(row)"
+            :loading="closingSalesDrawId === row.id"
+            :title="closeSalesDisabledReason(row)"
+            @click="$emit('closeSales', row.id)"
+          >
+            Close sales
           </BaseButton>
           <BaseButton
             v-if="props.canGenerate"

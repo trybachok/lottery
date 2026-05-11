@@ -5,6 +5,7 @@ import type { CreateDrawRequest, Draw, DrawResult, RunDrawResponse } from '@/sha
 import {
   activateAdminDraw,
   assignDrawManager,
+  closeAdminDrawSales,
   createAdminDraw,
   generateAdminWinningCombination,
   listAdminDraws,
@@ -18,6 +19,7 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
   const isLoading = ref(false)
   const isCreating = ref(false)
   const activatingDrawId = ref<string | null>(null)
+  const closingSalesDrawId = ref<string | null>(null)
   const generatingDrawId = ref<string | null>(null)
   const runningDrawId = ref<string | null>(null)
   const assigningManagerDrawId = ref<string | null>(null)
@@ -66,6 +68,22 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
       return null
     } finally {
       activatingDrawId.value = null
+    }
+  }
+
+  async function closeSales(drawId: string): Promise<Draw | null> {
+    closingSalesDrawId.value = drawId
+    actionError.value = null
+
+    try {
+      const draw = await closeAdminDrawSales(drawId)
+      items.value = items.value.map((item) => (item.id === draw.id ? draw : item))
+      return draw
+    } catch (caughtError) {
+      actionError.value = mapApiError(caughtError)
+      return null
+    } finally {
+      closingSalesDrawId.value = null
     }
   }
 
@@ -132,6 +150,7 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
     isLoading,
     isCreating,
     activatingDrawId,
+    closingSalesDrawId,
     generatingDrawId,
     runningDrawId,
     assigningManagerDrawId,
@@ -140,6 +159,7 @@ export const useAdminDrawsStore = defineStore('admin-draws', () => {
     loadDraws,
     createDraw,
     activateDraw,
+    closeSales,
     generateWinningCombination,
     runDraw,
     assignManager,

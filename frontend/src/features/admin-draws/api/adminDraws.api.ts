@@ -1,6 +1,7 @@
 import {
   activateDraw,
   adminAssignDrawManager,
+  closeDrawSales,
   createDraw,
   generateWinningCombination,
   getDraws,
@@ -34,6 +35,17 @@ export async function createAdminDraw(request: CreateDrawRequest): Promise<Draw>
 
 export async function activateAdminDraw(drawId: string): Promise<Draw> {
   const response = await activateDraw({
+    path: {
+      drawId,
+    },
+    throwOnError: true,
+  })
+
+  return response.data
+}
+
+export async function closeAdminDrawSales(drawId: string): Promise<Draw> {
+  const response = await closeDrawSales({
     path: {
       drawId,
     },

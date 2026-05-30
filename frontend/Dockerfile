@@ -11,9 +11,10 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 
 COPY frontend ./
+COPY backend/src/main/resources/openapi /backend/src/main/resources/openapi
 ARG VITE_API_BASE_URL=/api/v1
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-RUN pnpm build
+RUN pnpm api:generate && pnpm build
 
 FROM nginx:1.27-alpine
 

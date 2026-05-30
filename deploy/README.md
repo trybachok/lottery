@@ -1,16 +1,16 @@
-# Lottery Deployment Notes
+# Заметки по деплою Lottery
 
-## Build
+## Сборка
 
-1. Copy `.env.example` to `.env`.
-2. Replace every `CHANGE_ME` value with a server-specific secret.
-3. Build artifacts and images:
+1. Скопируйте `.env.example` в `.env`.
+2. Замените все значения `CHANGE_ME` на секреты для конкретного сервера.
+3. Соберите артефакты и образы:
 
 ```sh
 ./scripts/build-production.sh
 ```
 
-## Start
+## Запуск
 
 ```sh
 docker compose up -d
@@ -18,40 +18,65 @@ docker compose ps
 ./scripts/smoke-test.sh
 ```
 
-The compose stack runs:
+Compose-стек запускает:
 
-- `postgres` with the named volume `postgres_data`;
-- `lottery-backend`, with Flyway migrations enabled by `LOTTERY_DB_MIGRATIONS_ENABLED=true`;
-- `lottery-frontend`, an Nginx SPA server bound to `127.0.0.1:${LOTTERY_HOST_HTTP_PORT}`.
+- `postgres` с именованным volume `postgres_data`;
+- `lottery-backend` с миграциями Flyway, включенными через `LOTTERY_DB_MIGRATIONS_ENABLED=true`;
+- `lottery-frontend`, Nginx-сервер для SPA, привязанный к `127.0.0.1:${LOTTERY_HOST_HTTP_PORT}`.
 
-## HTTPS Reverse Proxy
+## HTTPS reverse proxy
 
-Use `deploy/nginx/lottery-https.conf` as the host Nginx site template.
-Replace `lottery.example.com` and certificate paths with the real domain paths.
-The template proxies HTTPS traffic to the frontend container through `127.0.0.1:8080`.
+Используйте `deploy/nginx/lottery-https.conf` как шаблон сайта для host Nginx.
+Замените `lottery.example.com` и пути к сертификатам на реальные значения для домена.
+Шаблон проксирует HTTPS-трафик во frontend-контейнер через `127.0.0.1:8080`.
 
-## Backups
+## Резервные копии
 
-PostgreSQL data lives in the Docker volume `postgres_data`.
-Create a logical backup:
+Данные PostgreSQL хранятся в Docker volume `postgres_data`.
+Создать логическую резервную копию можно так:
 
 ```sh
 ./scripts/backup-postgres.sh
 ```
 
-Backups are written to `./backups`, which is intentionally ignored by git.
-Run this script from cron or systemd timer on the server.
+Резервные копии записываются в `./backups`; эта директория намеренно игнорируется git.
+Запускайте этот скрипт на сервере через cron или systemd timer.
 
-## Logging
+## Логирование
 
-Docker services use the `json-file` driver with size/count rotation configured by:
+Docker-сервисы используют драйвер `json-file` с ротацией по размеру и количеству файлов, которая настраивается переменными:
 
 - `LOTTERY_LOG_MAX_SIZE`
 - `LOTTERY_LOG_MAX_FILES`
 
-For host Nginx logs, install `deploy/logrotate/lottery` into `/etc/logrotate.d/lottery`.
+Для логов host Nginx установите `deploy/logrotate/lottery` в `/etc/logrotate.d/lottery`.
 
-## Release Step
+## Релизный шаг
 
-The default compose configuration runs migrations on backend startup.
-For stricter releases, set `LOTTERY_DB_MIGRATIONS_ENABLED=false` for normal app containers and run one temporary backend container with migrations enabled before deployment.
+По умолчанию compose-конфигурация запускает миграции при старте backend.
+Для более строгого релизного процесса установите `LOTTERY_DB_MIGRATIONS_ENABLED=false` для обычных app-контейнеров 
+и перед деплоем запустите один временный backend-контейнер с включенными миграциями.
+
+## Render Dashboard
+
+В репозитории есть Render Blueprint в `render.yaml`.
+Он разворачивает один Docker web-service с именем `lottery` и одну базу Render Postgres с именем `lottery-postgres`.
+
+Корневой `Dockerfile` предназначен для Render и реализует простой Docker-подход к деплою:
+
+- Maven собирает Java backend jar;
+- pnpm собирает Vue frontend;
+- runtime-образ запускает Java backend на внутреннем порту и Nginx на публичном `$PORT` от Render;
+- Nginx раздает SPA и проксирует `/api/*` и `/ready` в backend;
+- конфиг Nginx хранится в `deploy/render/nginx.conf.template`, а startup-скрипт только подставляет порты запуска.
+
+Шаги деплоя:
+
+1. Запушьте репозиторий в GitHub или GitLab.
+2. Откройте `https://dashboard.render.com/`.
+3. Создайте новый Blueprint из репозитория.
+4. Подтвердите сервисы из `render.yaml`.
+5. После первого деплоя откройте URL сервиса Render и зарегистрируйте первого пользователя `owner`.
+
+Backend автоматически принимает `DATABASE_URL` от Render и преобразует его в JDBC-подключение PostgreSQL.
+`PORT` от Render также используется, если `LOTTERY_HTTP_PORT` не задан.

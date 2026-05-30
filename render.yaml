@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: lottery
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /ready
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lottery-postgres
+          property: connectionString
+      - key: LOTTERY_DB_MIGRATIONS_ENABLED
+        value: "true"
+      - key: LOTTERY_BCRYPT_COST
+        value: "12"
+      - key: LOTTERY_ACCESS_TOKEN_TTL_SECONDS
+        value: "900"
+      - key: LOTTERY_ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: LOTTERY_MOCK_PAYMENT_WEBHOOK_SECRET
+        generateValue: true
+      - key: VITE_API_BASE_URL
+        value: /api/v1
+
+databases:
+  - name: lottery-postgres
+    plan: free
+    databaseName: lottery
+    user: lottery
+    postgresMajorVersion: "18"
